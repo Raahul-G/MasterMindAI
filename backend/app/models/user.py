@@ -1,8 +1,8 @@
 import uuid
-from sqlalchemy import String, Boolean, Text, ARRAY
+from sqlalchemy import String, Boolean, Text, ARRAY, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
-from datetime import datetime, timezone
+from datetime import datetime
 from app.core.database import Base
 
 
@@ -19,5 +19,5 @@ class User(Base):
     notion_access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     notion_workspace_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
