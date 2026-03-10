@@ -48,3 +48,4 @@ htmlcov/
 # Type checking
 .mypy_cache/
 .pytype/
+ROADMAP.md
