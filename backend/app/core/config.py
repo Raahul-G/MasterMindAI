@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     ANTHROPIC_API_KEY: str
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
+    LLM_PROVIDER: str = "anthropic"  # "anthropic" | "openai"
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o"
     GOOGLE_CLIENT_ID: str
     GOOGLE_CLIENT_SECRET: str
     NOTION_CLIENT_ID: str = ""
