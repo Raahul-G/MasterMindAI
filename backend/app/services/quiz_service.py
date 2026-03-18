@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.learning import Answer, Passage, Question, Quiz
+from app.models.learning import Answer, Module, Passage, Question, Quiz
 from app.schemas.learning import AnswerSubmission
 
 
@@ -54,6 +54,16 @@ async def score_quiz(
         quiz.total_questions = total
         quiz.passed = passed
         quiz.submitted_at = datetime.now(timezone.utc)
+
+        # If fully passed, mark the module as completed
+        if passed:
+            module_result = await db.execute(
+                select(Module).where(Module.id == quiz.module_id)
+            )
+            module = module_result.scalar_one_or_none()
+            if module and module.status != "completed":
+                module.status = "completed"
+                module.completed_at = datetime.now(timezone.utc)
 
     await db.commit()
 

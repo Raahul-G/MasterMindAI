@@ -84,3 +84,26 @@ class ModuleListItem(BaseModel):
     completed_at: datetime | None
 
     model_config = {"from_attributes": True}
+
+
+class ModuleDetail(BaseModel):
+    id: uuid.UUID
+    topic: str
+    level: str
+    eli5_text: str
+    status: str
+    markdown_url: str | None
+    notion_page_id: str | None
+    completed_at: datetime | None
+    created_at: datetime
+    passages: list[PassageResponse]
+
+    model_config = {"from_attributes": True}
+
+
+class ExportDownloadResponse(BaseModel):
+    download_url: str
+
+
+class ExportNotionResponse(BaseModel):
+    notion_page_url: str
