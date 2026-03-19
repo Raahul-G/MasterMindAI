@@ -1,11 +1,12 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.learning import Answer, Module, Passage, Question, Quiz
+from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
 from app.schemas.learning import AnswerSubmission
+from app.services import achievement_service, streak_service
 
 
 async def score_quiz(
@@ -16,6 +17,8 @@ async def score_quiz(
     """
     Scores a quiz by comparing user answers to correct answers.
     Saves all answers to the database.
+    If the quiz is fully passed, marks the module completed and triggers
+    streak + achievement updates automatically.
     Returns score, total, passed flag, and list of failed concept titles.
     """
     result = await db.execute(select(Question).where(Question.quiz_id == quiz_id))
@@ -46,7 +49,11 @@ async def score_quiz(
     total = len(answer_submissions)
     passed = correct_count == total
 
-    # Update quiz record with results
+    # Variables saved before commit — SQLAlchemy expires objects after db.commit()
+    completing_user_id = None
+    completing_module_id = None
+    is_first_attempt_perfect = False
+
     quiz_result = await db.execute(select(Quiz).where(Quiz.id == quiz_id))
     quiz = quiz_result.scalar_one_or_none()
     if quiz:
@@ -55,7 +62,6 @@ async def score_quiz(
         quiz.passed = passed
         quiz.submitted_at = datetime.now(timezone.utc)
 
-        # If fully passed, mark the module as completed
         if passed:
             module_result = await db.execute(
                 select(Module).where(Module.id == quiz.module_id)
@@ -64,8 +70,29 @@ async def score_quiz(
             if module and module.status != "completed":
                 module.status = "completed"
                 module.completed_at = datetime.now(timezone.utc)
+                completing_user_id = module.user_id
+                completing_module_id = module.id
+                is_first_attempt_perfect = quiz.attempt_number == 1
 
     await db.commit()
+
+    # Trigger streak + achievement updates for a newly completed module
+    if completing_user_id:
+        streak = await streak_service.update_streak(completing_user_id, db)
+
+        remediation_result = await db.execute(
+            select(func.count()).select_from(Remediation)
+            .where(Remediation.module_id == completing_module_id)
+        )
+        used_remediation = (remediation_result.scalar() or 0) > 0
+
+        await achievement_service.check_and_award_achievements(
+            user_id=completing_user_id,
+            db=db,
+            streak_count=streak.current_streak,
+            used_remediation=used_remediation,
+            first_attempt_perfect=is_first_attempt_perfect,
+        )
 
     # Fetch failed concept titles from the passages
     failed_concepts = []

@@ -5,6 +5,67 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 18 Mar 2026 at 15:30
+> Trigger: milestone — Milestone 4 complete (Gamification API)
+
+### 🎯 What Was Planned
+Build the full Gamification API: streaks, achievements catalogue, automatic award triggers on module completion, and two read endpoints (`GET /gamification/streak` and `GET /gamification/achievements`).
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/app/models/gamification.py` | Created | Defines `Streak`, `Achievement`, and `UserAchievement` ORM models |
+| `backend/app/models/__init__.py` | Modified | Imports the three gamification models so Alembic detects them |
+| `backend/app/services/streak_service.py` | Created | Updates and reads the user's streak record |
+| `backend/app/services/achievement_service.py` | Created | Awards achievements by slug and reads all earned achievements |
+| `backend/app/services/quiz_service.py` | Modified | Fires streak + achievement updates when a module is first completed |
+| `backend/app/schemas/gamification.py` | Created | `StreakResponse` and `AchievementResponse` Pydantic schemas |
+| `backend/app/routers/gamification.py` | Created | Two GET endpoints: `/gamification/streak` and `/gamification/achievements` |
+| `backend/main.py` | Modified | Registers the gamification router |
+| `backend/scripts/seed_achievements.py` | Created | Seeds 8 achievement definitions; idempotent |
+| `backend/tests/test_gamification.py` | Created | 18 unit tests covering streak logic and achievement conditions |
+
+#### Code Summary
+
+**`update_streak()` — `services/streak_service.py`**
+What it does: Fetches or creates the user's streak, then applies 3-case logic: same-day is a no-op, yesterday increments, anything older resets to 1. Always updates `longest_streak` if the new value is higher.
+Why this way: All cases collapse into one function called automatically after module completion — no manual calls needed.
+
+**`check_and_award_achievements()` — `services/achievement_service.py`**
+What it does: Counts the user's completed modules, then evaluates 8 slug/condition pairs (milestones, perfect score, remediation used, streak thresholds). Calls `_award_if_not_earned()` for each passing condition and commits only if something new was awarded.
+Why this way: Single function covers all 8 badges — easy to extend by adding a row to the `checks` list.
+
+**`_award_if_not_earned()` — `services/achievement_service.py`**
+What it does: Looks up an achievement by slug, checks the `user_achievements` join table, and inserts a row if the user hasn't earned it yet. Returns True if newly awarded.
+Why this way: Idempotent by design — safe to call on every module completion without risk of duplicates.
+
+**`score_quiz()` update — `services/quiz_service.py`**
+What it does: Saves `completing_user_id`, `completing_module_id`, and `is_first_attempt_perfect` to local variables before `db.commit()` (SQLAlchemy expires ORM objects after commit), then calls streak and achievement services post-commit.
+Why this way: Variables must be captured before commit because SQLAlchemy expires all attributes on flushed objects.
+
+**`GET /gamification/streak` — `routers/gamification.py`**
+What it does: Returns current streak, longest streak, and last activity date. Returns zeros and null date if the user has never completed a module.
+Why this way: Graceful zero-state means the frontend never needs to handle a 404 for new users.
+
+**`GET /gamification/achievements` — `routers/gamification.py`**
+What it does: Returns the full list of earned achievements with slug, name, description, icon, and earned timestamp, ordered by `earned_at`.
+Why this way: Direct delegation to `achievement_service.get_user_achievements()` — no logic in the router.
+
+### 🔄 Logic Changes
+`quiz_service.score_quiz()` previously only updated `module.status` and committed. Now it also fires streak and achievement updates. The pre-commit variable capture pattern was added specifically to avoid the SQLAlchemy post-commit expiry issue.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| None | — | — |
+
+### 📋 Planned vs Built
+Matched plan exactly. 38/38 tests passing (up from 20 before Milestone 4).
+
+---
+
 ## Devlog — 18 Mar 2026 at 14:15
 > Trigger: milestone — Milestone 3 complete (Export, Storage, Notion Integration)
 
