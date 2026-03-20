@@ -5,6 +5,52 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 20 Mar 2026 at 21:45
+> Trigger: milestone — Milestone 6 complete (Backend Polish + Railway Deploy)
+
+### 🎯 What Was Planned
+Polish the backend with a global exception handler, add Railway deployment config files, run Alembic migrations against Supabase, deploy to Railway, and verify the live API with a smoke test.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/main.py` | Modified | Added global exception handler — unhandled errors return clean JSON instead of stack traces |
+| `backend/Procfile` | Created | Tells Railway/Railpack the uvicorn start command |
+| `backend/railway.toml` | Created | Railway build config — switched through Railpack → Nixpacks → Dockerfile before landing on Dockerfile |
+| `Dockerfile` | Created | Multi-stage Docker build at repo root: installs from `backend/requirements.txt`, copies `backend/`, starts uvicorn on `$PORT` |
+| `railway.toml` | Created | Repo-root Railway config pointing to the Dockerfile builder with health check on `/health` |
+| `start.sh` | Created | Repo-root shell script for Railpack detection (later superseded by Dockerfile approach) |
+
+#### Code Summary
+
+**`unhandled_exception_handler()` — `backend/main.py`**
+What it does: Catches any unhandled `Exception`, logs the full traceback server-side, and returns `{"error": {"code": "internal_error", "message": "..."}}` with a 500 status. Without this, FastAPI returns raw tracebacks to the client.
+Why this way: Central handler at the app level means every route gets safe error responses automatically.
+
+**`Dockerfile` — repo root**
+What it does: Builds from `python:3.12-slim`, copies and installs `backend/requirements.txt`, copies the backend source, then starts uvicorn using `${PORT:-8000}` so Railway's injected `$PORT` is picked up automatically.
+Why this way: Railpack's auto-detection repeatedly failed in the monorepo structure; a Dockerfile gives full explicit control over build and start with no guessing.
+
+### 🔄 Logic Changes
+None to application logic. Deploy strategy changed significantly: started with Railpack + `railway.toml` at `backend/`, moved `start.sh` and `railway.toml` to repo root, then switched entirely to Dockerfile after Railpack continued failing to detect the Python app.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| `Railpack could not determine how to build the app` | Railpack couldn't detect Python in monorepo with Root Directory set | Tried `start.sh`, moving config to repo root, then switched to Dockerfile builder entirely |
+| Health check failing after Dockerfile worked | `DATABASE_URL` was deleted from Railway Variables during an edit | Re-added `DATABASE_URL` as a new variable |
+| `[Errno 101] Network is unreachable` on register | Railway couldn't reach Supabase direct connection (IPv6, port 5432 blocked) | Switched to Supabase connection pooler (`aws-1-us-east-1.pooler.supabase.com:6543`) |
+| `password authentication failed` | `DATABASE_URL` pasted with line breaks, truncating password to `Fr` | Deleted and re-entered variable as a single unbroken line |
+| `asyncpg TimeoutError` on pooler port 5432 | Railway blocks outbound port 5432 | Switched to Supabase transaction pooler port 6543 |
+| `DATABASE_URL Field required` on startup | Railway variable edit accidentally deleted the field | Re-added it as a new variable |
+
+### 📋 Planned vs Built
+Core goal matched: backend is live and all smoke test checks pass. The deploy path was significantly more complex than planned — Railpack's monorepo detection failed repeatedly, and Supabase connectivity required three iterations (direct → session pooler port 5432 → transaction pooler port 6543) before finding a path Railway could reach. The `statement_cache_size: 0` already set in `database.py` meant transaction mode worked without any code changes.
+
+---
+
 ## Devlog — 20 Mar 2026 at 20:10
 > Trigger: milestone — Milestone 5 complete (Social Features API)
 
