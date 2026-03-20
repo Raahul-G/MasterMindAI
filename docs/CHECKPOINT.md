@@ -5,6 +5,109 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 20 Mar 2026 at 20:10
+> Trigger: milestone — Milestone 5 complete (Social Features API)
+
+### 🎯 What Was Planned
+Build the full Social Features API: a friend graph (search, send request, accept), an activity feed showing events from the user and their friends, and automatic feed event posting wired into the existing quiz and achievement services.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/app/models/social.py` | Created | `Friendship` and `ActivityFeed` ORM models; `event_metadata` used as the Python attribute name due to SQLAlchemy reserved name conflict |
+| `backend/app/models/__init__.py` | Modified | Added `Friendship` and `ActivityFeed` imports so Alembic detects the new tables |
+| `backend/alembic/versions/dc8bd001fd56_add_social_tables.py` | Created | Migration that creates the `friendships` and `activity_feed` tables |
+| `backend/app/schemas/social.py` | Created | Six Pydantic schemas: `FriendRequestBody`, `FriendAcceptBody`, `UserSummary`, `FriendResponse`, `FriendRequestResponse`, `ActivityFeedItem`, `UserSearchResult` |
+| `backend/app/services/social_service.py` | Created | Five async functions covering the full friend graph: send, accept, list friends, list requests, search users |
+| `backend/app/services/feed_service.py` | Created | `post_activity()` writes feed events; `get_feed()` returns the 50 most recent events for a user and their friends |
+| `backend/app/services/quiz_service.py` | Modified | Captures `topic` and `level` before `db.commit()`, then calls `feed_service.post_activity()` for `module_completed` after streak and achievement updates |
+| `backend/app/services/achievement_service.py` | Modified | Added `feed_service` import; after committing new badges, loops through newly earned slugs and posts an `achievement_earned` event for each |
+| `backend/app/routers/social.py` | Created | Six endpoints: GET friends, GET requests, POST send request, POST accept, GET feed, GET search — all JWT-protected; `ValueError` from services mapped to HTTP 400 |
+| `backend/main.py` | Modified | Registered the social router |
+| `backend/tests/test_social.py` | Created | 13 pure unit tests covering friend ID resolution, request validation (self/duplicate), feed visibility, and metadata structure |
+
+#### Code Summary
+
+**`send_friend_request()` / `accept_friend_request()` — `services/social_service.py`**
+What it does: `send_friend_request` checks both directions of an existing friendship row before inserting to prevent duplicates and self-requests. `accept_friend_request` verifies the caller is the addressee and status is still `pending` before flipping it to `accepted`.
+Why this way: `ValueError` is raised on validation failure so the router can catch it cleanly and return a 400 — no HTTP concerns in the service layer.
+
+**`get_friends()` — `services/social_service.py`**
+What it does: Fetches accepted friendships, resolves the friend's ID from whichever side of the row the current user is on, then joins users and streaks in two separate queries. Returns a list of dicts with name, avatar, and streak.
+Why this way: The user can appear as either `requester_id` or `addressee_id`, so friend ID resolution must check both sides.
+
+**`post_activity()` / `get_feed()` — `services/feed_service.py`**
+What it does: `post_activity` inserts one `ActivityFeed` row — called internally, never from a router. `get_feed` finds friend IDs, fetches the 50 most recent events for the combined set of IDs, then joins user details in one final query.
+Why this way: Three queries total (friendships → events → users) is more predictable than JOINs, and the 50-row limit keeps the feed light.
+
+**Activity wiring — `quiz_service.py` + `achievement_service.py`**
+What it does: `quiz_service` captures `topic` and `level` before `db.commit()` (SQLAlchemy expires objects post-commit), then posts a `module_completed` event. `achievement_service` loops through newly earned slugs post-commit, re-fetches each Achievement row, and posts an `achievement_earned` event.
+Why this way: Side effects added without changing any return values or existing call sites — existing callers see no difference.
+
+### 🔄 Logic Changes
+`quiz_service.score_quiz()` previously captured only `completing_user_id`, `completing_module_id`, and `is_first_attempt_perfect` before commit. Added `completing_topic`, `completing_level`, `completing_score`, and `completing_total` to the pre-commit capture block to support the feed event payload.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| `InvalidRequestError: Attribute name 'metadata' is reserved` | SQLAlchemy's Declarative API reserves `metadata` on all mapped classes | Renamed Python attribute to `event_metadata` with `mapped_column("metadata", ...)` to keep the DB column name unchanged |
+| `KeyError: 'access_token'` in test script | Login endpoint takes JSON body, test used `data=` (form-encoded) | Changed to `json={"email": ..., "password": ...}` |
+| `KeyError: 'correct_answer'` in feed test | Quiz question responses intentionally omit `correct_answer` (not exposed to clients) | Fetched correct answers directly from DB via SQLAlchemy for the automated test script |
+
+### 📋 Planned vs Built
+Matched the plan. The only deviation was the `metadata` → `event_metadata` rename in the ORM model, forced by SQLAlchemy's reserved attribute name. The DB column is still called `metadata` so the schema and migration are unaffected. 50/50 tests passing (up from 38 before this milestone).
+
+---
+
+## Devlog — 19 Mar 2026 at 10:15
+> Trigger: manual /devlog — session wrap-up (Milestone 4 shipped, Milestone 5 drafted)
+
+### 🎯 What Was Planned
+Resume mid-Milestone 4 (schemas were the last thing written). Finish the gamification router and tests, commit and push, then draft Milestone 5.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/app/routers/gamification.py` | Created | Two GET endpoints: `/gamification/streak` and `/gamification/achievements` |
+| `backend/main.py` | Modified | Registered the gamification router alongside existing routers |
+| `backend/tests/test_gamification.py` | Created | 18 pure unit tests covering all streak and achievement condition logic |
+| `milestones/milestone-05-social.md` | Created | Full 10-chunk plan for the Social Features API milestone |
+
+#### Code Summary
+
+**`get_streak()` — `backend/app/routers/gamification.py`**
+What it does: Calls `streak_service.get_streak()` and returns a zero-state `StreakResponse` if no modules have been completed yet, so the frontend never receives a 404 for new users.
+Why this way: Returning zeros is safer than a 404 — the frontend can render a streak counter at 0 without special-casing a missing response.
+
+**`get_achievements()` — `backend/app/routers/gamification.py`**
+What it does: Delegates to `achievement_service.get_user_achievements()` and returns the list directly. Returns an empty list for users with no achievements yet.
+Why this way: No logic in the router — straight delegation to the service layer, consistent with all other endpoints.
+
+**18 test functions — `backend/tests/test_gamification.py`**
+What it does: Tests streak date arithmetic (new/consecutive/broken/same-day) and achievement condition evaluation (all 8 badges) using pure in-memory logic — no database or HTTP needed.
+Why this way: Pure functions make the core logic testable in isolation. Same pattern used for auth and quiz tests in earlier milestones.
+
+**`milestone-05-social.md` — `milestones/`**
+What it does: 10-chunk plan covering `Friendship` + `ActivityFeed` models, `social_service.py`, `feed_service.py`, activity wiring into quiz and achievement services, the social router, and 13 new unit tests.
+Why this way: Follows the same chunk-by-chunk format as previous milestones so each step can be built and verified independently.
+
+### 🔄 Logic Changes
+None. This session only finished pre-planned Milestone 4 chunks and planned Milestone 5 — no existing logic was changed.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| None | — | — |
+
+### 📋 Planned vs Built
+Matched plan. Router and tests completed as designed. 38/38 tests passing. Milestone 5 document written in full before the session ended.
+
+---
+
 ## Devlog — 18 Mar 2026 at 15:30
 > Trigger: milestone — Milestone 4 complete (Gamification API)
 

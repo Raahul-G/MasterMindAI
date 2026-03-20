@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.gamification import Achievement, UserAchievement
 from app.models.learning import Module
+from app.services import feed_service
 
 
 async def _award_if_not_earned(user_id: uuid.UUID, slug: str, db: AsyncSession) -> bool:
@@ -70,6 +71,21 @@ async def check_and_award_achievements(
 
     if newly_earned:
         await db.commit()
+
+    for slug in newly_earned:
+        achievement_result = await db.execute(select(Achievement).where(Achievement.slug == slug))
+        achievement = achievement_result.scalar_one_or_none()
+        if achievement:
+            await feed_service.post_activity(
+                user_id=user_id,
+                activity_type="achievement_earned",
+                metadata={
+                    "slug": achievement.slug,
+                    "name": achievement.name,
+                    "icon_emoji": achievement.icon_emoji,
+                },
+                db=db,
+            )
 
     return newly_earned
 

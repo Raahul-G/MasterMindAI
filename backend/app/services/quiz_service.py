@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
 from app.schemas.learning import AnswerSubmission
-from app.services import achievement_service, streak_service
+from app.services import achievement_service, feed_service, streak_service
 
 
 async def score_quiz(
@@ -52,6 +52,10 @@ async def score_quiz(
     # Variables saved before commit — SQLAlchemy expires objects after db.commit()
     completing_user_id = None
     completing_module_id = None
+    completing_topic = None
+    completing_level = None
+    completing_score = correct_count
+    completing_total = total
     is_first_attempt_perfect = False
 
     quiz_result = await db.execute(select(Quiz).where(Quiz.id == quiz_id))
@@ -72,6 +76,8 @@ async def score_quiz(
                 module.completed_at = datetime.now(timezone.utc)
                 completing_user_id = module.user_id
                 completing_module_id = module.id
+                completing_topic = module.topic
+                completing_level = module.level
                 is_first_attempt_perfect = quiz.attempt_number == 1
 
     await db.commit()
@@ -92,6 +98,18 @@ async def score_quiz(
             streak_count=streak.current_streak,
             used_remediation=used_remediation,
             first_attempt_perfect=is_first_attempt_perfect,
+        )
+
+        await feed_service.post_activity(
+            user_id=completing_user_id,
+            activity_type="module_completed",
+            metadata={
+                "topic": completing_topic,
+                "level": completing_level,
+                "score": completing_score,
+                "total": completing_total,
+            },
+            db=db,
         )
 
     # Fetch failed concept titles from the passages
