@@ -5,6 +5,73 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 23 Mar 2026 at 14:00
+> Trigger: milestone — Milestone 7 complete (Web Frontend, Chunks 1–7)
+
+### 🎯 What Was Planned
+Build the full React web frontend: scaffold Vite + Tailwind v4 + React Router, write the TypeScript type layer, API modules, and Zustand stores, then implement all pages (auth, dashboard, learning flow, profile, friends) and deploy to Vercel.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `frontend-web/vite.config.ts` | Modified | Added `@tailwindcss/vite` plugin for Tailwind v4 build integration |
+| `frontend-web/src/index.css` | Modified | Replaced Vite default CSS with single `@import "tailwindcss"` for Tailwind v4 |
+| `frontend-web/.env` / `.env.example` | Created | Points `VITE_API_BASE_URL` at live Railway backend; `.env` gitignored |
+| `frontend-web/src/types/index.ts` | Created | All 17 TypeScript interfaces: User, Passage, Question, Module, Streak, Achievement, and social types |
+| `frontend-web/src/api/axiosClient.ts` | Created | Single Axios instance; request interceptor reads JWT from `localStorage` and attaches `Authorization` header |
+| `frontend-web/src/api/{auth,learning,modules,social,gamification}.ts` | Created | Five typed API modules covering every backend endpoint; all calls go through `axiosClient` |
+| `frontend-web/src/store/authStore.ts` | Created | Zustand store: `user`, `token`, `setAuth()` (persists to localStorage), `clearAuth()` |
+| `frontend-web/src/store/learningStore.ts` | Created | Zustand store: holds the full in-progress learning session state (module, passages, quiz, result, remediations) |
+| `frontend-web/src/components/{LoadingSpinner,Navbar,ProtectedRoute,StreakCounter,PassageCard,ProgressBar,QuizCard,AchievementBadge}.tsx` | Created | 8 shared components used across all pages |
+| `frontend-web/src/pages/Landing.tsx` | Created | Hero page with headline, feature cards, and Login/Register CTA buttons |
+| `frontend-web/src/pages/{Login,Register}.tsx` | Created | Auth forms; on success call API → `getMe()` → `setAuth()` → redirect to `/dashboard` |
+| `frontend-web/src/pages/Dashboard.tsx` | Created | Fetches modules + streak in parallel on mount; shows module grid with level/status badges and a "Start New Module" button |
+| `frontend-web/src/pages/TopicSelection.tsx` | Created | Free-text topic input + 3-way level selector (Kid/Intermediate/Expert); calls `startModule()`, saves to store, navigates to `/learn` |
+| `frontend-web/src/pages/Learning.tsx` | Created | Shows ELI5 box (yellow) and passage cards; "Take the Quiz" calls `generateQuiz()` and navigates |
+| `frontend-web/src/pages/Quiz.tsx` | Created | One question at a time with progress bar; collects answers, submits on final question, saves result, navigates to results |
+| `frontend-web/src/pages/QuizResults.tsx` | Created | Shows score, pass/fail state, failed concept list; routes to `/complete` or triggers `remediate()` |
+| `frontend-web/src/pages/Remediation.tsx` | Created | Shows revised explanations with "Revised" badge; "Retake Quiz" generates a new quiz for the same module |
+| `frontend-web/src/pages/ModuleComplete.tsx` | Created | Celebration screen with score stats, earned achievements, Download Markdown button, and back to Dashboard |
+| `frontend-web/src/pages/Profile.tsx` | Created | Shows initials avatar, StreakCounter, 8-badge achievement grid (earned/locked), and editable interest_topics saved via `PUT /auth/interests` |
+| `frontend-web/src/pages/Friends.tsx` | Created | Debounced user search, incoming friend request list with Accept button, friends list with streak, and activity feed with `timeAgo` formatting |
+| `frontend-web/src/App.tsx` | Modified | Full React Router v6 route table: 13 routes, all protected routes wrapped in `ProtectedRoute` |
+
+#### Code Summary
+
+**`axiosClient` interceptor — `src/api/axiosClient.ts`**
+What it does: Reads `access_token` from `localStorage` on every request and injects it as `Authorization: Bearer <token>`. No manual header passing in any page or component.
+Why this way: Centralised once — every API call in the app gets auth headers automatically.
+
+**`useAuthStore` — `src/store/authStore.ts`**
+What it does: `setAuth()` writes the token to both `localStorage` and Zustand state. `clearAuth()` removes it from both. `token` initialises from `localStorage` so the user stays logged in across page refreshes.
+Why this way: `localStorage` as the persistence layer keeps things simple without needing a library like `zustand/middleware/persist`.
+
+**`useLearningStore` — `src/store/learningStore.ts`**
+What it does: Holds the entire learning session (module, passages, quiz, result, remediations). `reset()` clears all fields when the user returns to dashboard after completing a module.
+Why this way: Single store shared across 5 pages — no prop drilling, no URL state, no re-fetching already-loaded data.
+
+**`ProtectedRoute` — `src/components/ProtectedRoute.tsx`**
+What it does: Reads `token` from `useAuthStore`. If present, renders children; if not, redirects to `/login` with `replace` so the back button doesn't loop.
+Why this way: Thin wrapper applied once per route in `App.tsx` — no per-page auth checks.
+
+**Pages in `src/pages/`** (13 total)
+Group: auth pages (`Landing`, `Login`, `Register`) handle form submission + auth store update. Learning pages (`TopicSelection` → `ModuleComplete`) read/write `learningStore` and chain API calls via navigate on success. Social pages (`Profile`, `Friends`) fetch in parallel with `Promise.all` on mount and operate independently of the learning store.
+
+### 🔄 Logic Changes
+None — this is an entirely new codebase. No existing files from previous milestones were modified.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| None | — | — |
+
+### 📋 Planned vs Built
+Matched plan for Chunks 1–7. One small addition not in the plan: `src/api/gamification.ts` was created as a dedicated API module for streak and achievement calls (the plan had these inline in component `useEffect` calls using `axiosClient` directly). Extracted for consistency with the other API modules. The `PassageCard` component gained an optional `revised` prop to show the "Revised" badge when rendered in `Remediation.tsx`. Build produces 0 TypeScript errors across 105 modules. Chunks 8–9 (Vercel deploy + e2e browser test) pending.
+
+---
+
 ## Devlog — 20 Mar 2026 at 21:45
 > Trigger: milestone — Milestone 6 complete (Backend Polish + Railway Deploy)
 
