@@ -2,6 +2,17 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { register, getMe } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
+import type { AxiosError } from 'axios'
+
+function getErrorMessage(err: unknown): string {
+  const axiosErr = err as AxiosError<{ detail?: string; error?: { message?: string } }>
+  if (axiosErr?.response?.data) {
+    const d = axiosErr.response.data
+    if (d.detail) return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail)
+    if (d.error?.message) return d.error.message
+  }
+  return 'Something went wrong. Please try again.'
+}
 
 export default function Register() {
   const [fullName, setFullName] = useState('')
@@ -21,8 +32,8 @@ export default function Register() {
       const { data: user } = await getMe()
       setAuth(data.access_token, user)
       navigate('/dashboard')
-    } catch {
-      setError('Registration failed. Email may already be in use.')
+    } catch (err) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

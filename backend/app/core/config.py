@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"
 
+    @property
+    def allowed_origins(self) -> list[str]:
+        return [u.strip() for u in self.FRONTEND_URL.split(",") if u.strip()]
+
     class Config:
         env_file = ".env"
 
