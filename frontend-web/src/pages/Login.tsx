@@ -12,6 +12,9 @@ function getErrorMessage(err: unknown): string {
     if (d.detail) return typeof d.detail === 'string' ? d.detail : JSON.stringify(d.detail)
     if (d.error?.message) return d.error.message
   }
+  if (axiosErr?.code === 'ERR_NETWORK' || !axiosErr?.response) {
+    return 'Cannot reach the server. CORS may be blocking this request — update FRONTEND_URL in Railway.'
+  }
   return 'Something went wrong. Please try again.'
 }
 
