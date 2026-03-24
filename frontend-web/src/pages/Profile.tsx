@@ -27,6 +27,7 @@ export default function Profile() {
   const [interests, setInterests] = useState<string[]>(user?.interest_topics ?? [])
   const [newInterest, setNewInterest] = useState('')
   const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   useEffect(() => {
     Promise.all([getStreak(), getAchievements()])
@@ -43,12 +44,14 @@ export default function Profile() {
     const v = newInterest.trim()
     if (v && !interests.includes(v)) {
       setInterests((prev) => [...prev, v])
+      setSaved(false)
     }
     setNewInterest('')
   }
 
   const removeInterest = (i: string) => {
     setInterests((prev) => prev.filter((x) => x !== i))
+    setSaved(false)
   }
 
   const saveInterests = async () => {
@@ -57,6 +60,7 @@ export default function Profile() {
     try {
       const { data } = await updateInterests(interests)
       setAuth(token, data)
+      setSaved(true)
     } finally {
       setSaving(false)
     }
@@ -119,12 +123,16 @@ export default function Profile() {
             {interests.map((i) => (
               <span
                 key={i}
-                className="flex items-center gap-1 bg-indigo-50 text-indigo-700 text-sm font-medium px-3 py-1 rounded-full border border-indigo-200"
+                className={`flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full border transition-colors ${
+                  saved
+                    ? 'bg-green-50 text-green-700 border-green-300'
+                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                }`}
               >
                 {i}
                 <button
                   onClick={() => removeInterest(i)}
-                  className="ml-1 text-indigo-400 hover:text-indigo-700 font-bold"
+                  className={`ml-1 font-bold ${saved ? 'text-green-400 hover:text-green-700' : 'text-indigo-400 hover:text-indigo-700'}`}
                 >
                   ×
                 </button>
@@ -149,9 +157,13 @@ export default function Profile() {
           <button
             onClick={saveInterests}
             disabled={saving}
-            className="mt-4 w-full bg-indigo-600 text-white font-semibold py-3 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-50"
+            className={`mt-4 w-full font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 ${
+              saved
+                ? 'bg-green-600 text-white hover:bg-green-700'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700'
+            }`}
           >
-            {saving ? 'Saving...' : 'Save Interests'}
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Interests'}
           </button>
         </div>
       </div>

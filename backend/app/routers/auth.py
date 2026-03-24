@@ -52,6 +52,7 @@ async def update_interests(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    await auth_service.save_interests(str(current_user.id), data.interest_topics, db)
+    current_user.interest_topics = data.interest_topics
+    await db.commit()
     await db.refresh(current_user)
     return current_user
