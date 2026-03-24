@@ -13,16 +13,30 @@ export default function ModuleReview() {
   const navigate = useNavigate()
   const [review, setReview] = useState<ModuleReview | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) return
     getModuleReview(id)
       .then((res) => setReview(res.data))
-      .catch(() => navigate('/dashboard'))
+      .catch((err) => setError(err?.response?.data?.detail ?? err?.message ?? 'Failed to load review'))
       .finally(() => setLoading(false))
   }, [id])
 
   if (loading) return <><Navbar /><LoadingSpinner /></>
+
+  if (error) return (
+    <>
+      <Navbar />
+      <div className="max-w-2xl mx-auto px-6 py-12 text-center">
+        <p className="text-red-500 font-medium mb-2">Could not load review</p>
+        <p className="text-sm text-gray-400 mb-6">{error}</p>
+        <button onClick={() => navigate('/dashboard')} className="text-indigo-600 font-medium hover:underline">
+          Back to Dashboard
+        </button>
+      </div>
+    </>
+  )
   if (!review) return null
 
   return (
