@@ -4,7 +4,7 @@ import StreakCounter from '../components/StreakCounter'
 import AchievementBadge from '../components/AchievementBadge'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { getStreak, getAchievements } from '../api/gamification'
-import { updateInterests } from '../api/auth'
+import { updateInterests, getMe } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 import type { Streak, Achievement } from '../types'
 
@@ -31,12 +31,21 @@ export default function Profile() {
   const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([getStreak(), getAchievements()])
-      .then(([s, a]) => {
+    const load = async () => {
+      try {
+        const [s, a] = await Promise.all([getStreak(), getAchievements()])
         setStreak(s.data)
         setEarned(a.data)
-      })
-      .finally(() => setLoading(false))
+        if (!user && token) {
+          const { data: me } = await getMe()
+          setAuth(token, me)
+          setInterests(me.interest_topics ?? [])
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [])
 
   const earnedSlugs = new Set(earned.map((a) => a.slug))
