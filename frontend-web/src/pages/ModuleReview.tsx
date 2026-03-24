@@ -57,6 +57,11 @@ export default function ModuleReview() {
               )}
             </p>
           )}
+          {review.completed_at && (
+            <p className="text-xs text-gray-400 mt-0.5">
+              Completed {new Date(review.completed_at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+            </p>
+          )}
         </div>
 
         {/* ELI5 */}
@@ -86,25 +91,17 @@ export default function ModuleReview() {
                   <div className="flex flex-col gap-2">
                     {q.options.map((opt) => {
                       const isCorrect = opt === q.correct_answer
-                      const isUserAnswer = opt === q.user_answer
-                      let cls = 'px-4 py-2.5 rounded-xl border-2 text-sm flex items-center justify-between '
-                      if (isCorrect) cls += 'border-green-400 bg-green-50 text-green-800'
-                      else if (isUserAnswer && !isCorrect) cls += 'border-red-300 bg-red-50 text-red-700'
-                      else cls += 'border-gray-100 bg-gray-50 text-gray-500'
+                      const cls = isCorrect
+                        ? 'px-4 py-2.5 rounded-xl border-2 text-sm flex items-center justify-between border-green-400 bg-green-50 text-green-800'
+                        : 'px-4 py-2.5 rounded-xl border-2 text-sm flex items-center justify-between border-gray-100 bg-gray-50 text-gray-500'
                       return (
                         <div key={opt} className={cls}>
                           <span>{opt}</span>
-                          <span>
-                            {isCorrect && '✓'}
-                            {isUserAnswer && !isCorrect && '✗'}
-                          </span>
+                          {isCorrect && <span>✓</span>}
                         </div>
                       )
                     })}
                   </div>
-                  {q.user_answer === null && (
-                    <p className="text-xs text-gray-400 mt-2">Not answered</p>
-                  )}
                 </div>
               ))}
             </div>

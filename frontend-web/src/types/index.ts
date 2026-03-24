@@ -121,6 +121,7 @@ export interface ModuleReview {
   level: string
   eli5_text: string
   status: string
+  completed_at: string | null
   passages: Passage[]
   quiz_score: number | null
   quiz_total: number | null

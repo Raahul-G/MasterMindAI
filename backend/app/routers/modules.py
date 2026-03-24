@@ -123,6 +123,7 @@ async def get_module_review(
         level=module.level,
         eli5_text=module.eli5_text,
         status=module.status,
+        completed_at=module.completed_at,
         passages=[PassageResponse.model_validate(p) for p in passages],
         quiz_score=quiz.score if quiz else None,
         quiz_total=quiz.total_questions if quiz else None,

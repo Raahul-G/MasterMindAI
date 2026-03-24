@@ -124,6 +124,7 @@ class ModuleReviewResponse(BaseModel):
     level: str
     eli5_text: str
     status: str
+    completed_at: datetime | None
     passages: list[PassageResponse]
     quiz_score: int | None
     quiz_total: int | None
