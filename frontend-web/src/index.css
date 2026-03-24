@@ -1,1 +1,58 @@
 @import "tailwindcss";
+
+@theme {
+  /* Primary green (Duolingo-style) — overrides Tailwind defaults */
+  --color-green-50: #F0FDF4;
+  --color-green-100: #DCFCE7;
+  --color-green-200: #BBF7D0;
+  --color-green-500: #71E01A;
+  --color-green-600: #58CC02;
+  --color-green-700: #46A302;
+
+  /* Deep purple brand */
+  --color-purple-100: #F3E8FF;
+  --color-purple-600: #7602CC;
+  --color-purple-700: #5D01A1;
+
+  /* Gamification orange */
+  --color-orange-50: #FFF7ED;
+  --color-orange-600: #FF9600;
+
+  /* Error red */
+  --color-red-500: #EA2B2B;
+
+  /* Forest (themed neutral text — forest-900 is dark green, rest match gray) */
+  --color-forest-900: #14532D;
+  --color-forest-800: #1F2937;
+  --color-forest-700: #374151;
+  --color-forest-400: #9CA3AF;
+  --color-forest-200: #E5E7EB;
+  --color-forest-100: #F3F4F6;
+
+  /* Mint (success/correct state) */
+  --color-mint-100: #D7FFB1;
+  --color-mint-600: #22C55E;
+
+  --font-sans: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+
+  --animate-bounce-success: bounce-success 0.5s ease-in-out;
+  --animate-shake-error: shake-error 0.5s ease-in-out;
+}
+
+@keyframes bounce-success {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes shake-error {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-10px); }
+  40% { transform: translateX(10px); }
+  60% { transform: translateX(-6px); }
+  80% { transform: translateX(6px); }
+}
+
+body {
+  font-family: 'Nunito', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}

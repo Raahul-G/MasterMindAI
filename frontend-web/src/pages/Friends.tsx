@@ -94,7 +94,7 @@ export default function Friends() {
     <>
       <Navbar />
       <div className="max-w-2xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Friends</h1>
+        <h1 className="text-2xl font-bold text-forest-900 mb-6">Friends</h1>
 
         {/* Search */}
         <div className="mb-8">
@@ -103,15 +103,15 @@ export default function Friends() {
             value={query}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder="Search by name..."
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-400"
+            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-500"
           />
           {searchLoading && <p className="text-xs text-gray-400 mt-2">Searching...</p>}
           {searchResults.length > 0 && (
-            <div className="mt-2 border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+            <div className="mt-2 border-2 border-gray-200 rounded-xl overflow-hidden">
               {searchResults.map((u) => (
                 <div key={u.id} className="flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">
                       {initials(u.full_name)}
                     </div>
                     <span className="text-sm font-medium text-gray-800">{u.full_name}</span>
@@ -119,7 +119,7 @@ export default function Friends() {
                   <button
                     onClick={() => handleSendRequest(u.id)}
                     disabled={sentIds.has(u.id)}
-                    className="text-xs font-semibold text-indigo-600 hover:underline disabled:text-gray-400"
+                    className="text-xs font-semibold text-green-600 hover:underline disabled:text-gray-400"
                   >
                     {sentIds.has(u.id) ? 'Sent' : 'Add Friend'}
                   </button>
@@ -132,19 +132,19 @@ export default function Friends() {
         {/* Incoming requests */}
         {requests.length > 0 && (
           <div className="mb-8">
-            <h2 className="text-lg font-bold text-gray-900 mb-3">Friend Requests</h2>
+            <h2 className="text-lg font-bold text-forest-900 mb-3">Friend Requests</h2>
             <div className="flex flex-col gap-2">
               {requests.map((r) => (
-                <div key={r.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                <div key={r.id} className="flex items-center justify-between bg-white border-2 border-gray-200 rounded-xl px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold">
+                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">
                       {initials(r.requester.full_name)}
                     </div>
                     <span className="text-sm font-medium text-gray-800">{r.requester.full_name}</span>
                   </div>
                   <button
                     onClick={() => handleAccept(r.id)}
-                    className="text-xs font-semibold bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition-colors"
+                    className="text-xs font-extrabold bg-green-600 text-white px-3 py-1.5 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight"
                   >
                     Accept
                   </button>
@@ -156,13 +156,13 @@ export default function Friends() {
 
         {/* Friends list */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Your Friends ({friends.length})</h2>
+          <h2 className="text-lg font-bold text-forest-900 mb-3">Your Friends ({friends.length})</h2>
           {friends.length === 0 ? (
             <p className="text-sm text-gray-400">No friends yet — search above to add some.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {friends.map((f) => (
-                <div key={f.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
+                <div key={f.id} className="flex items-center justify-between bg-white border-2 border-gray-200 rounded-xl px-4 py-3">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">
                       {initials(f.full_name)}
@@ -180,14 +180,14 @@ export default function Friends() {
 
         {/* Activity feed */}
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-3">Activity Feed</h2>
+          <h2 className="text-lg font-bold text-forest-900 mb-3">Activity Feed</h2>
           {feed.length === 0 ? (
             <p className="text-sm text-gray-400">No recent activity. Add friends to see what they're learning.</p>
           ) : (
             <div className="flex flex-col gap-2">
               {feed.map((item) => (
-                <div key={item.id} className="flex items-start gap-3 bg-white border border-gray-100 rounded-xl px-4 py-3 shadow-sm">
-                  <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 text-xs font-bold flex-shrink-0">
+                <div key={item.id} className="flex items-start gap-3 bg-white border-2 border-gray-200 rounded-xl px-4 py-3">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold flex-shrink-0">
                     {initials(item.user.full_name)}
                   </div>
                   <div className="flex-1 min-w-0">

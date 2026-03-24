@@ -33,7 +33,7 @@ export default function Remediation() {
       <div className="max-w-2xl mx-auto px-6 py-8">
         <div className="mb-6">
           <span className="text-xs font-bold text-orange-500 uppercase tracking-wide">Let's try again</span>
-          <h1 className="text-2xl font-bold text-gray-900 mt-0.5">Revised Explanations</h1>
+          <h1 className="text-2xl font-bold text-forest-900 mt-0.5">Revised Explanations</h1>
           <p className="text-gray-400 text-sm mt-1">Different analogies for the concepts you missed.</p>
         </div>
 
@@ -47,7 +47,7 @@ export default function Remediation() {
           ) : (
             <button
               onClick={handleRetake}
-              className="w-full bg-indigo-600 text-white font-semibold py-4 rounded-xl hover:bg-indigo-700 transition-colors text-lg"
+              className="w-full bg-green-600 text-white font-extrabold py-4 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight text-lg"
             >
               Retake Quiz
             </button>

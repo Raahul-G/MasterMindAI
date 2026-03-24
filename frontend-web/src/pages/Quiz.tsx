@@ -71,7 +71,7 @@ export default function Quiz() {
           <button
             onClick={handleNext}
             disabled={!selected}
-            className="mt-6 w-full bg-indigo-600 text-white font-semibold py-4 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-40 text-lg"
+            className="mt-6 w-full bg-green-600 text-white font-extrabold py-4 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight disabled:opacity-40 text-lg"
           >
             {isLast ? 'Submit Quiz' : 'Next'}
           </button>

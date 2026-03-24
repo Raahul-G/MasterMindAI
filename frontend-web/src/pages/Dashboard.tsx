@@ -12,9 +12,9 @@ import type { Module, Streak } from '../types'
 
 const LEVEL_LABELS = { kid: 'Kid', intermediate: 'Intermediate', expert: 'Expert' }
 const LEVEL_COLORS = {
-  kid: 'bg-green-100 text-green-700',
-  intermediate: 'bg-blue-100 text-blue-700',
-  expert: 'bg-purple-100 text-purple-700',
+  kid: 'bg-green-100 text-forest-900',
+  intermediate: 'bg-green-600 text-white',
+  expert: 'bg-purple-100 text-purple-600',
 }
 
 export default function Dashboard() {
@@ -60,7 +60,7 @@ export default function Dashboard() {
       <div className="max-w-4xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-forest-900">
               Welcome back{user ? `, ${user.full_name.split(' ')[0]}` : ''}!
             </h1>
             <p className="text-gray-400 text-sm mt-1">Pick up where you left off or start something new.</p>
@@ -70,7 +70,7 @@ export default function Dashboard() {
 
         <button
           onClick={() => navigate('/learn/start')}
-          className="w-full bg-indigo-600 text-white font-semibold py-4 rounded-2xl hover:bg-indigo-700 transition-colors text-lg mb-8 flex items-center justify-center gap-2"
+          className="w-full bg-green-600 text-white font-extrabold py-4 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight text-lg mb-8 flex items-center justify-center gap-2"
         >
           <span>+</span> Start New Module
         </button>
@@ -88,7 +88,7 @@ export default function Dashboard() {
             {modules.map((mod) => (
               <div
                 key={mod.id}
-                className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center justify-between"
+                className="bg-white border-2 border-gray-200 rounded-2xl p-5 flex items-center justify-between"
               >
                 <div>
                   <div className="flex items-center gap-2 mb-1">
@@ -101,7 +101,7 @@ export default function Dashboard() {
                       {mod.status === 'completed' ? 'Completed' : 'In Progress'}
                     </span>
                   </div>
-                  <h3 className="font-semibold text-gray-900">{mod.topic}</h3>
+                  <h3 className="font-semibold text-forest-900">{mod.topic}</h3>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {new Date(mod.created_at).toLocaleDateString()}
                   </p>
@@ -112,7 +112,7 @@ export default function Dashboard() {
                       ? navigate(`/modules/${mod.id}/review`)
                       : handleContinue(mod)
                   }
-                  className="text-sm text-indigo-600 font-medium hover:underline"
+                  className="text-sm text-green-600 font-medium hover:underline"
                 >
                   {mod.status === 'completed' ? 'Review' : 'Continue'}
                 </button>

@@ -12,11 +12,11 @@ export default function Navbar() {
 
   return (
     <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
-      <Link to="/dashboard" className="text-xl font-bold text-indigo-600">MasterMind</Link>
+      <Link to="/dashboard" className="text-xl font-bold text-purple-600">MasterMind</Link>
       {user && (
         <div className="flex items-center gap-4">
-          <Link to="/friends" className="text-sm text-gray-500 hover:text-indigo-600">Friends</Link>
-          <Link to="/profile" className="text-sm text-gray-600 hover:text-indigo-600">{user.full_name}</Link>
+          <Link to="/friends" className="text-sm text-gray-500 hover:text-green-600">Friends</Link>
+          <Link to="/profile" className="text-sm text-gray-600 hover:text-green-600">{user.full_name}</Link>
           <button onClick={logout} className="text-sm text-gray-400 hover:text-red-500">Logout</button>
         </div>
       )}

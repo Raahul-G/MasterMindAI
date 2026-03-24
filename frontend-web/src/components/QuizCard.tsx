@@ -7,17 +7,17 @@ interface Props {
 
 export default function QuizCard({ question, options, selected, onSelect }: Props) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <p className="text-lg font-semibold text-gray-800 mb-6">{question}</p>
+    <div className="bg-white rounded-2xl border-2 border-gray-200 p-6">
+      <p className="text-lg font-extrabold text-forest-900 mb-6 tracking-tight">{question}</p>
       <div className="flex flex-col gap-3">
         {options.map((opt) => (
           <button
             key={opt}
             onClick={() => onSelect(opt)}
-            className={`w-full text-left px-4 py-3 rounded-xl border-2 transition-all
+            className={`w-full text-left px-4 py-3 rounded-2xl border-2 font-bold transition-[border,background-color] duration-75
               ${selected === opt
-                ? 'border-indigo-500 bg-indigo-50 text-indigo-700 font-medium'
-                : 'border-gray-200 hover:border-indigo-300 text-gray-700'}`}
+                ? 'border-green-600 border-b-4 bg-green-50 text-green-700'
+                : 'border-gray-200 hover:border-green-400 text-gray-700'}`}
           >
             {opt}
           </button>

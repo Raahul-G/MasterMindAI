@@ -39,7 +39,7 @@ export default function TopicSelection() {
     <>
       <Navbar />
       <div className="max-w-2xl mx-auto px-6 py-12">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">What do you want to learn?</h1>
+        <h1 className="text-3xl font-bold text-forest-900 mb-2">What do you want to learn?</h1>
         <p className="text-gray-400 mb-8">Pick any topic — AI will teach it to you step by step.</p>
 
         <form onSubmit={handleStart} className="flex flex-col gap-6">
@@ -51,7 +51,7 @@ export default function TopicSelection() {
               onChange={(e) => setTopic(e.target.value)}
               required
               placeholder='e.g. "Quantum entanglement" or "How the internet works"'
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-indigo-400"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-base focus:outline-none focus:border-green-500"
             />
           </div>
 
@@ -65,12 +65,12 @@ export default function TopicSelection() {
                   onClick={() => setLevel(l.id)}
                   className={`flex flex-col items-center p-4 rounded-xl border-2 transition-all ${
                     level === l.id
-                      ? 'border-indigo-500 bg-indigo-50'
-                      : 'border-gray-200 hover:border-indigo-300 bg-white'
+                      ? 'border-green-500 bg-green-50'
+                      : 'border-gray-200 hover:border-green-400 bg-white'
                   }`}
                 >
                   <span className="text-2xl mb-1">{l.emoji}</span>
-                  <span className={`font-semibold text-sm ${level === l.id ? 'text-indigo-700' : 'text-gray-700'}`}>
+                  <span className={`font-semibold text-sm ${level === l.id ? 'text-green-700' : 'text-gray-700'}`}>
                     {l.label}
                   </span>
                   <span className="text-xs text-gray-400 mt-0.5 text-center">{l.desc}</span>
@@ -86,7 +86,7 @@ export default function TopicSelection() {
           ) : (
             <button
               type="submit"
-              className="bg-indigo-600 text-white font-semibold py-4 rounded-xl hover:bg-indigo-700 transition-colors text-lg"
+              className="bg-green-600 text-white font-extrabold py-4 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight text-lg"
             >
               Start Learning
             </button>

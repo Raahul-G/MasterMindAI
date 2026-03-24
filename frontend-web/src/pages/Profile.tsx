@@ -97,11 +97,11 @@ export default function Profile() {
       <div className="max-w-2xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <div className="w-14 h-14 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+          <div className="w-14 h-14 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl">
             {initials}
           </div>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{user?.full_name}</h1>
+            <h1 className="text-xl font-bold text-forest-900">{user?.full_name}</h1>
             <p className="text-sm text-gray-400">{user?.email}</p>
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function Profile() {
 
         {/* Achievements */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Achievements</h2>
+          <h2 className="text-lg font-bold text-forest-900 mb-4">Achievements</h2>
           <div className="grid grid-cols-2 gap-3">
             {ALL_ACHIEVEMENTS.map((a) => (
               <AchievementBadge
@@ -131,7 +131,7 @@ export default function Profile() {
 
         {/* Interests */}
         <div>
-          <h2 className="text-lg font-bold text-gray-900 mb-1">Learning Interests</h2>
+          <h2 className="text-lg font-bold text-forest-900 mb-1">Learning Interests</h2>
           <p className="text-sm text-gray-400 mb-4">Used to personalise your ELI5 explanations.</p>
           <div className="flex flex-wrap gap-2 mb-4">
             {interests.map((i) => (
@@ -140,13 +140,13 @@ export default function Profile() {
                 className={`flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full border transition-colors ${
                   saved
                     ? 'bg-green-50 text-green-700 border-green-300'
-                    : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                    : 'bg-green-50 text-green-700 border-green-200'
                 }`}
               >
                 {i}
                 <button
                   onClick={() => removeInterest(i)}
-                  className={`ml-1 font-bold ${saved ? 'text-green-400 hover:text-green-700' : 'text-indigo-400 hover:text-indigo-700'}`}
+                  className={`ml-1 font-bold ${saved ? 'text-green-400 hover:text-green-700' : 'text-green-500 hover:text-green-700'}`}
                 >
                   ×
                 </button>
@@ -159,11 +159,11 @@ export default function Profile() {
               onChange={(e) => setNewInterest(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addInterest()}
               placeholder="Add an interest (e.g. Cricket, Cooking)"
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-indigo-400"
+              className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-green-500"
             />
             <button
               onClick={addInterest}
-              className="bg-indigo-100 text-indigo-700 font-semibold px-4 py-2 rounded-xl hover:bg-indigo-200 transition-colors text-sm"
+              className="bg-green-100 text-green-700 font-semibold px-4 py-2 rounded-xl hover:bg-green-200 transition-colors text-sm"
             >
               Add
             </button>
@@ -171,11 +171,7 @@ export default function Profile() {
           <button
             onClick={saveInterests}
             disabled={saving}
-            className={`mt-4 w-full font-semibold py-3 rounded-xl transition-colors disabled:opacity-50 ${
-              saved
-                ? 'bg-green-600 text-white hover:bg-green-700'
-                : 'bg-indigo-600 text-white hover:bg-indigo-700'
-            }`}
+            className={`mt-4 w-full font-extrabold py-3 rounded-2xl border-b-4 border-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight disabled:opacity-50 bg-green-600 text-white hover:bg-green-700`}
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Interests'}
           </button>
