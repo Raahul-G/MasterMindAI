@@ -1,5 +1,5 @@
 import uuid
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,10 +15,11 @@ async def update_streak(user_id: uuid.UUID, db: AsyncSession) -> Streak:
     - Last activity yesterday → increments by 1
     - Last activity older  → resets to 1
     Always updates longest_streak if current exceeds it.
+    Uses UTC date consistently to match Railway's server timezone.
     """
     result = await db.execute(select(Streak).where(Streak.user_id == user_id))
     streak = result.scalar_one_or_none()
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
 
     if not streak:
         streak = Streak(
@@ -35,7 +36,7 @@ async def update_streak(user_id: uuid.UUID, db: AsyncSession) -> Streak:
     if streak.last_activity_date == today:
         return streak  # Already updated today — no change
 
-    yesterday = date.fromordinal(today.toordinal() - 1)
+    yesterday = date.fromordinal(today.toordinal() - 1)  # date arithmetic, no timezone needed
     if streak.last_activity_date == yesterday:
         streak.current_streak += 1
     else:
