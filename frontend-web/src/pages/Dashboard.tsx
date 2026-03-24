@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import StreakCounter from '../components/StreakCounter'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { getModules } from '../api/modules'
+import { getModules, getModule } from '../api/modules'
 import { getStreak } from '../api/gamification'
 import { getMe } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
+import { useLearningStore } from '../store/learningStore'
 import type { Module, Streak } from '../types'
 
 const LEVEL_LABELS = { kid: 'Kid', intermediate: 'Intermediate', expert: 'Expert' }
@@ -21,7 +22,18 @@ export default function Dashboard() {
   const [streak, setStreak] = useState<Streak | null>(null)
   const [loading, setLoading] = useState(true)
   const { user, setAuth, token } = useAuthStore()
+  const setModule = useLearningStore((s) => s.setModule)
   const navigate = useNavigate()
+
+  const handleContinue = async (mod: Module) => {
+    try {
+      const { data } = await getModule(mod.id)
+      setModule(data.id.toString(), data.topic, data.level, data.eli5_text ?? '', data.passages)
+      navigate('/learn')
+    } catch {
+      navigate('/learn/start')
+    }
+  }
 
   useEffect(() => {
     const load = async () => {
@@ -95,7 +107,11 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <button
-                  onClick={() => navigate('/learn/start')}
+                  onClick={() =>
+                    mod.status === 'completed'
+                      ? navigate(`/modules/${mod.id}/review`)
+                      : handleContinue(mod)
+                  }
                   className="text-sm text-indigo-600 font-medium hover:underline"
                 >
                   {mod.status === 'completed' ? 'Review' : 'Continue'}

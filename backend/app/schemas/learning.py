@@ -107,3 +107,25 @@ class ExportDownloadResponse(BaseModel):
 
 class ExportNotionResponse(BaseModel):
     notion_page_url: str
+
+
+class ReviewQuestionResponse(BaseModel):
+    question_text: str
+    concept_title: str
+    options: list[str]
+    correct_answer: str
+    user_answer: str | None
+    is_correct: bool | None
+
+
+class ModuleReviewResponse(BaseModel):
+    id: uuid.UUID
+    topic: str
+    level: str
+    eli5_text: str
+    status: str
+    passages: list[PassageResponse]
+    quiz_score: int | None
+    quiz_total: int | None
+    quiz_attempts: int | None
+    questions: list[ReviewQuestionResponse]

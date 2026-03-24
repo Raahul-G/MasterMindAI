@@ -6,14 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.dependencies import get_current_user
-from app.models.learning import Module, Passage
+from app.models.learning import Answer, Module, Passage, Question, Quiz
 from app.models.user import User
 from app.schemas.learning import (
     ExportDownloadResponse,
     ExportNotionResponse,
     ModuleDetail,
     ModuleListItem,
+    ModuleReviewResponse,
     PassageResponse,
+    ReviewQuestionResponse,
 )
 from app.services import markdown_service, storage_service
 
@@ -62,6 +64,70 @@ async def get_module(
         completed_at=module.completed_at,
         created_at=module.created_at,
         passages=[PassageResponse.model_validate(p) for p in passages],
+    )
+
+
+@router.get("/{module_id}/review", response_model=ModuleReviewResponse)
+async def get_module_review(
+    module_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    module_result = await db.execute(
+        select(Module).where(Module.id == module_id, Module.user_id == current_user.id)
+    )
+    module = module_result.scalar_one_or_none()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    passage_result = await db.execute(
+        select(Passage).where(Passage.module_id == module_id).order_by(Passage.order_index)
+    )
+    passages = passage_result.scalars().all()
+
+    # Most recent quiz (passed or latest attempt)
+    quiz_result = await db.execute(
+        select(Quiz)
+        .where(Quiz.module_id == module_id)
+        .order_by(Quiz.attempt_number.desc())
+    )
+    quiz = quiz_result.scalars().first()
+
+    questions_with_answers: list[ReviewQuestionResponse] = []
+    if quiz:
+        question_result = await db.execute(
+            select(Question).where(Question.quiz_id == quiz.id).order_by(Question.order_index)
+        )
+        questions = question_result.scalars().all()
+
+        answer_result = await db.execute(
+            select(Answer).where(Answer.quiz_id == quiz.id)
+        )
+        answers = answer_result.scalars().all()
+        answer_map = {a.question_id: a for a in answers}
+
+        for q in questions:
+            ans = answer_map.get(q.id)
+            questions_with_answers.append(ReviewQuestionResponse(
+                question_text=q.question_text,
+                concept_title=q.concept_title,
+                options=q.options,
+                correct_answer=q.correct_answer,
+                user_answer=ans.user_answer if ans else None,
+                is_correct=ans.is_correct if ans else None,
+            ))
+
+    return ModuleReviewResponse(
+        id=module.id,
+        topic=module.topic,
+        level=module.level,
+        eli5_text=module.eli5_text,
+        status=module.status,
+        passages=[PassageResponse.model_validate(p) for p in passages],
+        quiz_score=quiz.score if quiz else None,
+        quiz_total=quiz.total_questions if quiz else None,
+        quiz_attempts=quiz.attempt_number if quiz else None,
+        questions=questions_with_answers,
     )
 
 

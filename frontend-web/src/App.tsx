@@ -12,6 +12,7 @@ import Remediation from './pages/Remediation'
 import ModuleComplete from './pages/ModuleComplete'
 import Profile from './pages/Profile'
 import Friends from './pages/Friends'
+import ModuleReview from './pages/ModuleReview'
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/complete" element={<ProtectedRoute><ModuleComplete /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
+        <Route path="/modules/:id/review" element={<ProtectedRoute><ModuleReview /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -105,3 +105,25 @@ export interface UserSearchResult {
   full_name: string
   avatar_url: string | null
 }
+
+export interface ReviewQuestion {
+  question_text: string
+  concept_title: string
+  options: string[]
+  correct_answer: string
+  user_answer: string | null
+  is_correct: boolean | null
+}
+
+export interface ModuleReview {
+  id: string
+  topic: string
+  level: string
+  eli5_text: string
+  status: string
+  passages: Passage[]
+  quiz_score: number | null
+  quiz_total: number | null
+  quiz_attempts: number | null
+  questions: ReviewQuestion[]
+}
