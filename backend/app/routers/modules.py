@@ -106,12 +106,14 @@ async def get_module_review(
         answers = answer_result.scalars().all()
         answer_map = {a.question_id: a for a in answers}
 
+        passage_id_to_title = {p.id: p.concept_title for p in passages}
+
         for q in questions:
             ans = answer_map.get(q.id)
             questions_with_answers.append(ReviewQuestionResponse(
                 question_text=q.question_text,
-                concept_title=q.concept_title,
-                options=q.options,
+                concept_title=passage_id_to_title.get(q.passage_id, ""),
+                options=q.options or [],
                 correct_answer=q.correct_answer,
                 user_answer=ans.user_answer if ans else None,
                 is_correct=ans.is_correct if ans else None,
