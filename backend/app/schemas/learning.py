@@ -82,6 +82,7 @@ class ModuleListItem(BaseModel):
     level: str
     status: str
     completed_at: datetime | None
+    created_at: datetime
 
     model_config = {"from_attributes": True}
 
