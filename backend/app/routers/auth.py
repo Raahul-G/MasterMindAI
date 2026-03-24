@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.schemas.auth import RegisterRequest, LoginRequest, GoogleLoginRequest, TokenResponse, UserResponse
 from app.services import auth_service
 from app.dependencies import get_current_user
 from app.models.user import User
+
+
+class UpdateInterestsRequest(BaseModel):
+    interest_topics: list[str]
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -41,13 +46,12 @@ async def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@router.post("/interests")
-async def save_interests(
-    interests: list[str],
+@router.put("/interests", response_model=UserResponse)
+async def update_interests(
+    data: UpdateInterestsRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    if len(interests) < 3 or len(interests) > 5:
-        raise HTTPException(status_code=400, detail="Provide between 3 and 5 interests")
-    await auth_service.save_interests(str(current_user.id), interests, db)
-    return {"message": "Interests saved"}
+    await auth_service.save_interests(str(current_user.id), data.interest_topics, db)
+    await db.refresh(current_user)
+    return current_user

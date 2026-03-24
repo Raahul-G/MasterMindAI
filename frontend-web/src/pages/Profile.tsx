@@ -10,13 +10,13 @@ import type { Streak, Achievement } from '../types'
 
 const ALL_ACHIEVEMENTS = [
   { slug: 'first_steps', name: 'First Steps', description: 'Complete your first module', icon_emoji: '👣' },
-  { slug: 'on_a_roll', name: 'On a Roll', description: '3-day streak', icon_emoji: '🎯' },
-  { slug: 'week_warrior', name: 'Week Warrior', description: '7-day streak', icon_emoji: '⚔️' },
-  { slug: 'perfect_score', name: 'Perfect Score', description: 'Score 100% on a quiz', icon_emoji: '💯' },
-  { slug: 'speed_learner', name: 'Speed Learner', description: 'Complete 5 modules', icon_emoji: '⚡' },
-  { slug: 'curious_mind', name: 'Curious Mind', description: 'Complete 10 modules', icon_emoji: '🔭' },
-  { slug: 'no_hints', name: 'First Try', description: 'Pass without remediation', icon_emoji: '🥇' },
-  { slug: 'social_butterfly', name: 'Social Butterfly', description: 'Add your first friend', icon_emoji: '🦋' },
+  { slug: 'clean_sweep', name: 'First Try', description: 'Pass without remediation', icon_emoji: '🥇' },
+  { slug: 'comeback_kid', name: 'Comeback Kid', description: 'Pass after using remediation', icon_emoji: '💪' },
+  { slug: 'knowledge_seeker', name: 'Speed Learner', description: 'Complete 5 modules', icon_emoji: '⚡' },
+  { slug: 'scholar', name: 'Curious Mind', description: 'Complete 10 modules', icon_emoji: '🔭' },
+  { slug: 'streak_starter', name: 'On a Roll', description: '3-day streak', icon_emoji: '🎯' },
+  { slug: 'hot_streak', name: 'Week Warrior', description: '7-day streak', icon_emoji: '⚔️' },
+  { slug: 'dedicated', name: 'Dedicated', description: '14-day streak', icon_emoji: '🏆' },
 ]
 
 export default function Profile() {
