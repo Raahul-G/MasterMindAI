@@ -52,7 +52,9 @@ async def update_interests(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    from sqlalchemy.orm.attributes import flag_modified
     current_user.interest_topics = data.interest_topics
+    flag_modified(current_user, "interest_topics")
     await db.commit()
     await db.refresh(current_user)
     return current_user

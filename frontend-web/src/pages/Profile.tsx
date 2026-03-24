@@ -28,6 +28,7 @@ export default function Profile() {
   const [newInterest, setNewInterest] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   useEffect(() => {
     Promise.all([getStreak(), getAchievements()])
@@ -57,10 +58,14 @@ export default function Profile() {
   const saveInterests = async () => {
     if (!user || !token) return
     setSaving(true)
+    setSaveError(null)
     try {
       const { data } = await updateInterests(interests)
       setAuth(token, data)
       setSaved(true)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } }; message?: string }
+      setSaveError(e?.response?.data?.detail ?? e?.message ?? 'Failed to save interests')
     } finally {
       setSaving(false)
     }
@@ -165,6 +170,9 @@ export default function Profile() {
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Interests'}
           </button>
+          {saveError && (
+            <p className="mt-2 text-sm text-red-500 text-center">{saveError}</p>
+          )}
         </div>
       </div>
     </>
