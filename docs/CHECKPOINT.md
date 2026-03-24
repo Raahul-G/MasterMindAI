@@ -5,6 +5,72 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 24 Mar 2026 at 20:15
+> Trigger: milestone — post-launch bug fixes + full gamified UI retheme
+
+### 🎯 What Was Planned
+Fix all bugs found during live testing (module review, streak, achievements, save interests, invalid date), then apply a full Duolingo-inspired visual retheme: custom color palette, Nunito font, 3D buttons, gamified progress bar, card depth system, and success/error animations.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/app/routers/modules.py` | Modified | Fixed `AttributeError` on review endpoint — `q.concept_title` doesn't exist on `Question` model; replaced with `passage_id_to_title` map built from fetched passages |
+| `backend/app/schemas/learning.py` | Modified | Added `completed_at` and `created_at` to `ModuleReviewResponse` and `ModuleListItem` schemas |
+| `backend/app/services/streak_service.py` | Modified | Replaced `date.today()` with `datetime.now(timezone.utc).date()` to prevent double-increment when modules complete near UTC midnight |
+| `backend/app/routers/auth.py` | Modified | Replaced `POST /auth/interests` (bare list body) with `PUT /auth/interests` (`UpdateInterestsRequest` Pydantic model); updates `current_user` directly with `flag_modified()` to force SQLAlchemy ARRAY dirty detection |
+| `backend/app/services/achievement_service.py` | Modified | No code change — root cause was frontend slug mismatch |
+| `frontend-web/src/types/index.ts` | Modified | Added `completed_at` to `ModuleReview`; added `created_at` to `Module` interface |
+| `frontend-web/src/pages/ModuleReview.tsx` | Modified | Added completed date in header; simplified quiz to show only correct answer green ✓ (removed red/grey logic) |
+| `frontend-web/src/pages/Dashboard.tsx` | Modified | Fixed Review button (`/modules/:id/review`), Continue button (loads existing module into store); fixed `Invalid Date` from missing `created_at` |
+| `frontend-web/src/pages/Profile.tsx` | Modified | Added `getMe()` fallback on mount to restore user after reload; fixed achievement slug mapping; added `saved` state (green tags + "Saved!" button); added error display for save failures |
+| `frontend-web/src/index.css` | Modified | Added `@theme` with full custom color palette (green/purple/forest/mint/orange/red overrides) + Nunito font + bounce-success and shake-error keyframe animations |
+| `frontend-web/index.html` | Modified | Added Nunito Google Fonts preconnect + stylesheet link; changed title to MasterMind |
+| `frontend-web/src/components/ProgressBar.tsx` | Modified | Increased to `h-5` (20px); added white shine overlay `div` for gel/3D effect |
+| `frontend-web/src/components/QuizCard.tsx` | Modified | Replaced `shadow-sm` with `border-2 border-gray-200`; selected option uses `border-green-600 border-b-4` raised card style |
+| `frontend-web/src/pages/QuizResults.tsx` | Modified | Added `animate-bounce-success` on pass, `animate-shake-error` on fail to result status box |
+| 20 frontend files | Modified | Full color retheme: indigo → green primary, purple brand, forest-900 headings, blue ELI5 box, mint correct answers, Duolingo-style level badges; all `bg-green-600` buttons get `border-b-4 border-green-700 active:translate-y-[2px] active:border-b-2` 3D press effect |
+
+#### Code Summary
+
+**`get_module_review()` — `backend/app/routers/modules.py`**
+What it does: Builds `passage_id_to_title` dict from already-fetched passages, uses it to populate `concept_title` per question instead of accessing the non-existent `q.concept_title` attribute.
+Why this way: `Question` model has no `concept_title` column — it lives on `Passage`. Same pattern used in `generate_quiz_for_module`.
+
+**`update_streak()` — `backend/app/services/streak_service.py`**
+What it does: Uses `datetime.now(timezone.utc).date()` instead of `date.today()` for UTC-consistent date comparison, preventing double-increment when two completions straddle UTC midnight.
+Why this way: Railway runs UTC; `date.today()` uses server local time which could differ.
+
+**`update_interests()` — `backend/app/routers/auth.py`**
+What it does: Accepts `{ interest_topics: [...] }` via PUT, mutates `current_user.interest_topics` directly, calls `flag_modified()` to force SQLAlchemy to detect ARRAY column change, commits, returns updated `UserResponse`.
+Why this way: SQLAlchemy `ARRAY(Text)` reassignment is not reliably detected as dirty without `flag_modified`.
+
+**Gamified button system — all page files**
+What it does: `border-b-4 border-green-700` creates physical depth; `active:translate-y-[2px] active:border-b-2` simulates button being pressed down; `transition-[transform,border-bottom-width] duration-75` makes it snappy.
+Why this way: Spec required `border-bottom` depth (not `box-shadow`) to match Duolingo's chunky button feel.
+
+### 🔄 Logic Changes
+- **Streak update**: was `date.today()` (server local) → now `datetime.now(timezone.utc).date()` (always UTC)
+- **Interests endpoint**: was `POST` with bare `list[str]` body returning `{"message":"..."}` → now `PUT` with Pydantic model returning `UserResponse`
+- **Achievement display**: frontend `ALL_ACHIEVEMENTS` slugs (`on_a_roll`, `no_hints`, etc.) had zero overlap with backend slugs (`streak_starter`, `clean_sweep`, etc.) — replaced entirely
+- **3D buttons**: previous session used `box-shadow` approach → replaced with `border-bottom` approach per design spec
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| "Network Error" on review page | `q.concept_title` accessed on `Question` ORM object which has no such column → `AttributeError` crashed endpoint before response sent | Built `passage_id_to_title` map from fetched passages; used `passage_id_to_title.get(q.passage_id, "")` |
+| "Invalid Date" on dashboard cards | `ModuleListItem` schema missing `created_at` field so `mod.created_at` was `undefined` in frontend | Added `created_at: datetime` to `ModuleListItem` schema |
+| Streak counting 2 for same-day completions | `date.today()` on Railway (UTC) vs user's local timezone crossing midnight UTC | Switched to `datetime.now(timezone.utc).date()` |
+| Save Interests silently failing | Three stacked mismatches: wrong HTTP method (PUT vs POST), wrong body shape, wrong response type | Fixed all three; also added `flag_modified()` for SQLAlchemy ARRAY detection |
+| Achievements never highlighting | Frontend slugs (`on_a_roll`, `no_hints`, `social_butterfly`) had zero match with backend slugs (`streak_starter`, `clean_sweep`, `comeback_kid`) | Replaced entire `ALL_ACHIEVEMENTS` array with correct backend slugs |
+| Profile shows "?" after reload | `user` not persisted in Zustand (only `token` in localStorage); Profile page never called `getMe()` | Added `getMe()` fallback in Profile's `useEffect`, same pattern as Dashboard |
+
+### 📋 Planned vs Built
+Significantly more bug-fixing than planned — the review page, streak, achievements, interests save, and profile reload all had independent bugs discovered during live testing. The gamified retheme matched the spec closely; the one addition was removing `box-shadow` from the previous (incorrect) 3D implementation and replacing it with the `border-bottom` approach from the design spec.
+
+---
+
 ## Devlog — 23 Mar 2026 at 14:00
 > Trigger: milestone — Milestone 7 complete (Web Frontend, Chunks 1–7)
 
