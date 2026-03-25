@@ -15,8 +15,13 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Convert async URL (postgresql+asyncpg://) to sync URL (postgresql://) for Alembic
-sync_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+# Convert async URL to sync psycopg2 URL for Alembic
+# asyncpg uses ?ssl=require; psycopg2 uses ?sslmode=require
+sync_url = (
+    settings.DATABASE_URL
+    .replace("postgresql+asyncpg://", "postgresql://")
+    .replace("?ssl=require", "?sslmode=require")
+)
 config.set_main_option("sqlalchemy.url", sync_url)
 
 
