@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.gamification import Streak
 
 
-async def update_streak(user_id: uuid.UUID, db: AsyncSession) -> Streak:
+async def update_streak(user_id: uuid.UUID, db: AsyncSession, local_date: date | None = None) -> Streak:
     """
     Updates the user's streak when they complete a module.
     - No record yet        → creates streak at 1
@@ -15,11 +15,11 @@ async def update_streak(user_id: uuid.UUID, db: AsyncSession) -> Streak:
     - Last activity yesterday → increments by 1
     - Last activity older  → resets to 1
     Always updates longest_streak if current exceeds it.
-    Uses UTC date consistently to match Railway's server timezone.
+    Uses the user's local date if provided, otherwise falls back to UTC.
     """
     result = await db.execute(select(Streak).where(Streak.user_id == user_id))
     streak = result.scalar_one_or_none()
-    today = datetime.now(timezone.utc).date()
+    today = local_date if local_date is not None else datetime.now(timezone.utc).date()
 
     if not streak:
         streak = Streak(

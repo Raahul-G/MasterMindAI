@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 import uuid
 
 from pydantic import BaseModel
@@ -52,6 +52,7 @@ class AnswerSubmission(BaseModel):
 class SubmitQuizRequest(BaseModel):
     quiz_id: uuid.UUID
     answers: list[AnswerSubmission]
+    local_date: date | None = None
 
 
 class SubmitQuizResponse(BaseModel):

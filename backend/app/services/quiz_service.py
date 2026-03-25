@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +13,7 @@ async def score_quiz(
     quiz_id: uuid.UUID,
     answer_submissions: list[AnswerSubmission],
     db: AsyncSession,
+    local_date: date | None = None,
 ) -> dict:
     """
     Scores a quiz by comparing user answers to correct answers.
@@ -84,7 +85,7 @@ async def score_quiz(
 
     # Trigger streak + achievement updates for a newly completed module
     if completing_user_id:
-        streak = await streak_service.update_streak(completing_user_id, db)
+        streak = await streak_service.update_streak(completing_user_id, db, local_date)
 
         remediation_result = await db.execute(
             select(func.count()).select_from(Remediation)

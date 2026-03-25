@@ -45,7 +45,7 @@ async def submit_quiz(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await quiz_service.score_quiz(data.quiz_id, data.answers, db)
+    result = await quiz_service.score_quiz(data.quiz_id, data.answers, db, data.local_date)
     return SubmitQuizResponse(**result)
 
 
