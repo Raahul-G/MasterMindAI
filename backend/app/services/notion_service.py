@@ -13,6 +13,7 @@ Auto-export:
 
 import base64
 import uuid
+from urllib.parse import urlencode
 
 import httpx
 from sqlalchemy import select
@@ -32,14 +33,14 @@ NOTION_AUTH_URL = "https://api.notion.com/v1/oauth/authorize"
 
 def get_auth_url(user_id: str) -> str:
     """Builds the Notion OAuth authorisation URL. State carries the user ID."""
-    params = (
-        f"?client_id={settings.NOTION_CLIENT_ID}"
-        f"&response_type=code"
-        f"&owner=user"
-        f"&redirect_uri={settings.NOTION_REDIRECT_URI}"
-        f"&state={user_id}"
-    )
-    return NOTION_AUTH_URL + params
+    params = urlencode({
+        "client_id": settings.NOTION_CLIENT_ID,
+        "response_type": "code",
+        "owner": "user",
+        "redirect_uri": settings.NOTION_REDIRECT_URI,
+        "state": user_id,
+    })
+    return f"{NOTION_AUTH_URL}?{params}"
 
 
 async def exchange_code_for_token(code: str) -> dict:
