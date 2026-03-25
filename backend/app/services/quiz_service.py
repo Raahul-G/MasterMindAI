@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import date, datetime, timezone
 
@@ -5,8 +6,11 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
+from app.models.user import User
 from app.schemas.learning import AnswerSubmission
-from app.services import achievement_service, feed_service, streak_service
+from app.services import achievement_service, feed_service, notion_service, streak_service
+
+logger = logging.getLogger(__name__)
 
 
 async def score_quiz(
@@ -83,7 +87,9 @@ async def score_quiz(
 
     await db.commit()
 
-    # Trigger streak + achievement updates for a newly completed module
+    # Trigger streak + achievement + Notion updates for a newly completed module
+    notion_page_url: str | None = None
+
     if completing_user_id:
         streak = await streak_service.update_streak(completing_user_id, db, local_date)
 
@@ -113,6 +119,33 @@ async def score_quiz(
             db=db,
         )
 
+        # Auto-create Notion sub-page if the user has Notion connected
+        user_result = await db.execute(select(User).where(User.id == completing_user_id))
+        user = user_result.scalar_one_or_none()
+        if (
+            user
+            and user.notion_access_token
+            and user.notion_mastermind_page_id
+            and completing_module_id
+        ):
+            try:
+                notion_page_url = await notion_service.create_module_subpage(
+                    access_token=user.notion_access_token,
+                    mastermind_page_id=user.notion_mastermind_page_id,
+                    module_id=completing_module_id,
+                    db=db,
+                )
+                # Save the Notion page URL back to the module
+                module_update = await db.execute(
+                    select(Module).where(Module.id == completing_module_id)
+                )
+                completed_module = module_update.scalar_one_or_none()
+                if completed_module:
+                    completed_module.notion_page_id = notion_page_url.split("/")[-1]
+                    await db.commit()
+            except Exception as exc:
+                logger.warning("Notion auto-export failed for module %s: %s", completing_module_id, exc)
+
     # Fetch failed concept titles from the passages
     failed_concepts = []
     if failed_passage_ids:
@@ -127,4 +160,5 @@ async def score_quiz(
         "total": total,
         "passed": passed,
         "failed_concepts": failed_concepts,
+        "notion_page_url": notion_page_url,
     }

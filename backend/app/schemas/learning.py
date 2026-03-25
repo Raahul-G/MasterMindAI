@@ -60,6 +60,7 @@ class SubmitQuizResponse(BaseModel):
     total: int
     passed: bool
     failed_concepts: list[str]
+    notion_page_url: str | None = None
 
 
 class RemediateRequest(BaseModel):

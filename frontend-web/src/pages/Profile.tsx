@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import StreakCounter from '../components/StreakCounter'
 import AchievementBadge from '../components/AchievementBadge'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { getStreak, getAchievements } from '../api/gamification'
 import { updateInterests, getMe } from '../api/auth'
+import { getNotionAuthUrl, disconnectNotion } from '../api/notion'
 import { useAuthStore } from '../store/authStore'
 import type { Streak, Achievement } from '../types'
 
@@ -21,6 +23,7 @@ const ALL_ACHIEVEMENTS = [
 
 export default function Profile() {
   const { user, token, setAuth } = useAuthStore()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [streak, setStreak] = useState<Streak | null>(null)
   const [earned, setEarned] = useState<Achievement[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,22 +33,42 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
+  // Notion state
+  const [notionConnected, setNotionConnected] = useState(user?.notion_connected ?? false)
+  const [notionWorkspace, setNotionWorkspace] = useState<string | null>(user?.notion_workspace_name ?? null)
+  const [notionLoading, setNotionLoading] = useState(false)
+  const [notionBanner, setNotionBanner] = useState<'connected' | 'error' | null>(null)
+
   useEffect(() => {
     const load = async () => {
       try {
         const [s, a] = await Promise.all([getStreak(), getAchievements()])
         setStreak(s.data)
         setEarned(a.data)
-        if (!user && token) {
+
+        // Refresh user to get latest notion status
+        if (token) {
           const { data: me } = await getMe()
           setAuth(token, me)
           setInterests(me.interest_topics ?? [])
+          setNotionConnected(me.notion_connected)
+          setNotionWorkspace(me.notion_workspace_name)
         }
       } finally {
         setLoading(false)
       }
     }
     load()
+
+    // Handle redirect back from Notion OAuth
+    const notionParam = searchParams.get('notion')
+    if (notionParam === 'connected') {
+      setNotionBanner('connected')
+      setSearchParams({}, { replace: true })
+    } else if (notionParam === 'error') {
+      setNotionBanner('error')
+      setSearchParams({}, { replace: true })
+    }
   }, [])
 
   const earnedSlugs = new Set(earned.map((a) => a.slug))
@@ -77,6 +100,31 @@ export default function Profile() {
       setSaveError(e?.response?.data?.detail ?? e?.message ?? 'Failed to save interests')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleConnectNotion = async () => {
+    setNotionLoading(true)
+    try {
+      const { data } = await getNotionAuthUrl()
+      window.location.href = data.url
+    } catch {
+      setNotionBanner('error')
+      setNotionLoading(false)
+    }
+  }
+
+  const handleDisconnectNotion = async () => {
+    setNotionLoading(true)
+    try {
+      await disconnectNotion()
+      setNotionConnected(false)
+      setNotionWorkspace(null)
+      if (user && token) {
+        setAuth(token, { ...user, notion_connected: false, notion_workspace_name: null })
+      }
+    } finally {
+      setNotionLoading(false)
     }
   }
 
@@ -130,7 +178,7 @@ export default function Profile() {
         </div>
 
         {/* Interests */}
-        <div>
+        <div className="mb-8">
           <h2 className="text-lg font-bold text-forest-900 mb-1">Learning Interests</h2>
           <p className="text-sm text-gray-400 mb-4">Used to personalise your ELI5 explanations.</p>
           <div className="flex flex-wrap gap-2 mb-4">
@@ -177,6 +225,55 @@ export default function Profile() {
           </button>
           {saveError && (
             <p className="mt-2 text-sm text-red-500 text-center">{saveError}</p>
+          )}
+        </div>
+
+        {/* Notion Integration */}
+        <div>
+          <h2 className="text-lg font-bold text-forest-900 mb-1">Notion</h2>
+          <p className="text-sm text-gray-400 mb-4">
+            Connect your Notion workspace. Every completed module will automatically appear as a sub-page.
+          </p>
+
+          {notionBanner === 'connected' && (
+            <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700 font-medium">
+              Notion connected! Your MasterMind page has been created.
+            </div>
+          )}
+          {notionBanner === 'error' && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">
+              Something went wrong connecting Notion. Please try again.
+            </div>
+          )}
+
+          {notionConnected ? (
+            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xl">N</span>
+                <div>
+                  <p className="text-sm font-semibold text-gray-800">
+                    {notionWorkspace ?? 'Notion'}
+                  </p>
+                  <p className="text-xs text-green-600">Connected</p>
+                </div>
+              </div>
+              <button
+                onClick={handleDisconnectNotion}
+                disabled={notionLoading}
+                className="text-sm text-red-400 hover:text-red-600 font-medium disabled:opacity-50"
+              >
+                {notionLoading ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleConnectNotion}
+              disabled={notionLoading}
+              className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white font-extrabold py-3 rounded-2xl border-b-4 border-gray-700 hover:bg-gray-800 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight disabled:opacity-50"
+            >
+              <span className="text-lg font-bold">N</span>
+              {notionLoading ? 'Redirecting...' : 'Connect Notion'}
+            </button>
           )}
         </div>
       </div>

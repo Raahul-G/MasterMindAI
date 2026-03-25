@@ -1,11 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import AchievementBadge from '../components/AchievementBadge'
 import { exportDownload } from '../api/modules'
 import { getAchievements } from '../api/gamification'
 import { useLearningStore } from '../store/learningStore'
-import { useEffect } from 'react'
 import type { Achievement } from '../types'
 
 export default function ModuleComplete() {
@@ -69,6 +68,27 @@ export default function ModuleComplete() {
                 <AchievementBadge key={a.slug} emoji={a.icon_emoji} name={a.name} description={a.description} />
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Notion auto-export banner */}
+        {quizResult.notion_page_url && (
+          <div className="mb-6 flex items-center justify-between bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 text-left">
+            <div className="flex items-center gap-3">
+              <span className="text-xl font-bold text-gray-800">N</span>
+              <div>
+                <p className="text-sm font-semibold text-gray-800">Saved to Notion</p>
+                <p className="text-xs text-gray-400">A page was created in your MasterMind workspace</p>
+              </div>
+            </div>
+            <a
+              href={quizResult.notion_page_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-semibold text-gray-700 hover:text-gray-900 underline underline-offset-2"
+            >
+              Open
+            </a>
           </div>
         )}
 

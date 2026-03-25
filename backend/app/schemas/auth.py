@@ -36,5 +36,8 @@ class UserResponse(BaseModel):
     avatar_url: str | None
     interest_topics: list[str] | None
     is_active: bool
+    # Derived from notion_access_token via User.notion_connected property
+    notion_connected: bool = False
+    notion_workspace_name: str | None = None
 
     model_config = {"from_attributes": True}

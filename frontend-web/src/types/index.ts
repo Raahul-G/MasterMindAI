@@ -5,6 +5,8 @@ export interface User {
   avatar_url: string | null
   interest_topics: string[] | null
   is_active: boolean
+  notion_connected: boolean
+  notion_workspace_name: string | null
 }
 
 export interface Passage {
@@ -33,6 +35,7 @@ export interface QuizResult {
   total: number
   passed: boolean
   failed_concepts: string[]
+  notion_page_url: string | null
 }
 
 export interface Remediation {

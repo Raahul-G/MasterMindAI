@@ -1,8 +1,10 @@
 import uuid
-from sqlalchemy import String, Boolean, Text, ARRAY, DateTime, func
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
+
+from sqlalchemy import ARRAY, Boolean, DateTime, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import Mapped, mapped_column
+
 from app.core.database import Base
 
 
@@ -18,6 +20,13 @@ class User(Base):
     interest_topics: Mapped[list[str] | None] = mapped_column(ARRAY(Text), nullable=True)
     notion_access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
     notion_workspace_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    notion_workspace_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    notion_mastermind_page_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+    @property
+    def notion_connected(self) -> bool:
+        """Derived field — read by Pydantic UserResponse via from_attributes=True."""
+        return self.notion_access_token is not None
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
