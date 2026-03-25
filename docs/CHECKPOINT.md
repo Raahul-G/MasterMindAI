@@ -5,6 +5,55 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 24 Mar 2026 at 22:10
+> Trigger: manual /devlog — streak timezone fix + favicon added
+
+### 🎯 What Was Planned
+Fix streak logic so it runs on the user's local timezone (EST) instead of server UTC, resolving a bug where the streak stayed stuck at 1 despite two consecutive days of activity. Also replace the placeholder SVG favicon with proper browser/app icon files.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/app/schemas/learning.py` | Modified | Added `local_date: date \| None = None` field to `SubmitQuizRequest` |
+| `backend/app/services/streak_service.py` | Modified | `update_streak()` now accepts `local_date` and uses it over UTC fallback |
+| `backend/app/services/quiz_service.py` | Modified | `score_quiz()` accepts and forwards `local_date` to `update_streak()` |
+| `backend/app/routers/learning.py` | Modified | Passes `data.local_date` from request into `score_quiz()` |
+| `frontend-web/src/api/learning.ts` | Modified | `submitQuiz()` computes user's local YYYY-MM-DD date and sends it with every request |
+| `frontend-web/public/favicon.ico` | Created | Standard browser favicon (ICO format, all browsers) |
+| `frontend-web/public/favicon-16x16.png` | Created | Small tab icon |
+| `frontend-web/public/favicon-32x32.png` | Created | Retina tab icon |
+| `frontend-web/public/apple-touch-icon.png` | Created | iOS "Add to Home Screen" icon |
+| `frontend-web/public/android-chrome-192x192.png` | Created | Android home screen shortcut |
+| `frontend-web/public/android-chrome-512x512.png` | Created | Android splash / PWA icon |
+| `frontend-web/index.html` | Modified | Replaced single SVG favicon link with full set of ico/png/apple-touch link tags |
+
+#### Code Summary
+
+**`update_streak()` — `backend/app/services/streak_service.py`**
+What it does: Accepts an optional `local_date: date | None` parameter. If provided, uses it as "today" for all streak comparisons; otherwise falls back to `datetime.now(timezone.utc).date()`.
+Why this way: Backend can't know the user's timezone — browser is the only source of truth for local date, so it's passed in rather than computed server-side.
+
+**`submitQuiz()` — `frontend-web/src/api/learning.ts`**
+What it does: Computes the user's local date using `new Date()` (not UTC) as `YYYY-MM-DD` and includes it as `local_date` in the POST body alongside quiz answers.
+Why this way: One-liner at the API call site — no changes needed in `Quiz.tsx` or anywhere else in the frontend.
+
+### 🔄 Logic Changes
+Before: `streak_service.py` used `datetime.now(timezone.utc).date()` — server clock, always UTC regardless of where the user is.
+After: Browser sends its local date with every quiz submission; backend uses that date for all streak day comparisons. UTC is only the fallback if `local_date` is absent.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| Streak stuck at 1 after two consecutive days | Previous session's manual SQL `SET current_streak=1` reset data the code had already correctly written | Pending SQL fix: `UPDATE streaks SET current_streak=2, longest_streak=2 WHERE user_id=(SELECT id FROM users WHERE email='raahulg19@gmail.com')` |
+| Streak incremented at wrong day boundary for EST users | Backend used server UTC; completing a module after 8 PM EST would register as next UTC day | Frontend now sends local date; backend uses it directly |
+
+### 📋 Planned vs Built
+Not planned in advance — both fixes were reactive. Streak timezone fix emerged from the user observing the streak didn't behave correctly in their timezone. Favicon was a direct user request. Both shipped cleanly with no regressions.
+
+---
+
 ## Devlog — 24 Mar 2026 at 20:15
 > Trigger: milestone — post-launch bug fixes + full gamified UI retheme
 
