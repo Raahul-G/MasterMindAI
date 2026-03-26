@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { startModule } from '../api/learning'
@@ -12,12 +12,17 @@ const LEVELS = [
 ] as const
 
 export default function TopicSelection() {
-  const [topic, setTopic] = useState('')
+  const location = useLocation()
+  const locationState = location.state as { topic?: string; prerequisite_concepts?: string[] } | null
+
+  const [topic, setTopic] = useState(locationState?.topic ?? '')
   const [level, setLevel] = useState<'kid' | 'intermediate' | 'expert'>('intermediate')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const setModule = useLearningStore((s) => s.setModule)
   const navigate = useNavigate()
+
+  const prerequisiteConcepts = locationState?.prerequisite_concepts ?? []
 
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,7 +30,7 @@ export default function TopicSelection() {
     setError('')
     setLoading(true)
     try {
-      const { data } = await startModule(topic.trim(), level)
+      const { data } = await startModule(topic.trim(), level, prerequisiteConcepts.length > 0 ? prerequisiteConcepts : undefined)
       setModule(data.module_id, topic.trim(), level, data.eli5_text, data.passages)
       navigate('/learn')
     } catch {
@@ -41,6 +46,12 @@ export default function TopicSelection() {
       <div className="max-w-2xl mx-auto px-6 py-12">
         <h1 className="text-3xl font-bold text-forest-900 mb-2">What do you want to learn?</h1>
         <p className="text-gray-400 mb-8">Pick any topic — AI will teach it to you step by step.</p>
+
+        {prerequisiteConcepts.length > 0 && (
+          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
+            Builds on: <span className="font-semibold">{prerequisiteConcepts.join(', ')}</span>
+          </div>
+        )}
 
         <form onSubmit={handleStart} className="flex flex-col gap-6">
           <div>

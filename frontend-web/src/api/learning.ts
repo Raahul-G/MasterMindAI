@@ -1,8 +1,8 @@
 import axiosClient from './axiosClient'
-import type { StartModuleResponse, GenerateQuizResponse, QuizResult, Remediation, AnswerSubmission } from '../types'
+import type { StartModuleResponse, GenerateQuizResponse, QuizResult, Remediation, AnswerSubmission, KnowledgeMapResponse } from '../types'
 
-export const startModule = (topic: string, level: string) =>
-  axiosClient.post<StartModuleResponse>('/learn/start', { topic, level })
+export const startModule = (topic: string, level: string, prerequisite_concepts?: string[]) =>
+  axiosClient.post<StartModuleResponse>('/learn/start', { topic, level, prerequisite_concepts: prerequisite_concepts ?? [] })
 
 export const generateQuiz = (module_id: string) =>
   axiosClient.post<GenerateQuizResponse>('/learn/quiz/generate', { module_id })
@@ -15,3 +15,6 @@ export const submitQuiz = (quiz_id: string, answers: AnswerSubmission[]) => {
 
 export const remediate = (module_id: string, quiz_id: string, failed_concepts: string[]) =>
   axiosClient.post<{ remediations: Remediation[] }>('/learn/remediate', { module_id, quiz_id, failed_concepts })
+
+export const getKnowledgeMap = () =>
+  axiosClient.get<KnowledgeMapResponse>('/learn/knowledge-map')

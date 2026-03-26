@@ -111,3 +111,15 @@ class Remediation(Base):
 
     passage: Mapped["Passage"] = relationship("Passage", back_populates="remediations")
     quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="remediations")
+
+
+class ConceptGraph(Base):
+    __tablename__ = "concept_graph"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    source_module_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
+    topic: Mapped[str] = mapped_column(Text, nullable=False)
+    learned_concepts: Mapped[list] = mapped_column(JSONB, nullable=False)
+    recommended_concepts: Mapped[list] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

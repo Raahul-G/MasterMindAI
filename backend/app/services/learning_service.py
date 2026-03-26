@@ -21,18 +21,21 @@ async def start_module(
     level: str,
     user: User,
     db: AsyncSession,
+    prerequisite_concepts: list[str] | None = None,
 ) -> StartModuleResponse:
     """
     Starts a new learning module:
     1. Generates ELI5 using the user's stored interests
-    2. Generates 2-3 passages at the chosen level
+    2. Generates 2-3 passages at the chosen level (graph-aware if prerequisites provided)
     3. Saves everything to the database
     4. Returns the module ID, ELI5, and passages
     """
     interests = user.interest_topics or ["general knowledge", "science", "history"]
 
     eli5_text = await ai_service.generate_eli5(topic, level, interests)
-    raw_passages = await ai_service.generate_passages(topic, level, eli5_text)
+    raw_passages = await ai_service.generate_passages(
+        topic, level, eli5_text, prerequisite_concepts=prerequisite_concepts
+    )
 
     module = Module(user_id=user.id, topic=topic, level=level, eli5_text=eli5_text)
     db.add(module)

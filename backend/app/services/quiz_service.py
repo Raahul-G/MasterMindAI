@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
 from app.models.user import User
 from app.schemas.learning import AnswerSubmission
-from app.services import achievement_service, feed_service, notion_service, streak_service
+from app.services import achievement_service, feed_service, notion_service, recommendation_service, streak_service
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,7 @@ async def score_quiz(
     completing_level = None
     completing_score = correct_count
     completing_total = total
+    completing_concept_titles: list[str] = []
     is_first_attempt_perfect = False
 
     quiz_result = await db.execute(select(Quiz).where(Quiz.id == quiz_id))
@@ -84,6 +85,12 @@ async def score_quiz(
                 completing_topic = module.topic
                 completing_level = module.level
                 is_first_attempt_perfect = quiz.attempt_number == 1
+
+                # Fetch concept titles before commit (objects expire after commit)
+                passage_result = await db.execute(
+                    select(Passage).where(Passage.module_id == module.id).order_by(Passage.order_index)
+                )
+                completing_concept_titles = [p.concept_title for p in passage_result.scalars().all()]
 
     await db.commit()
 
@@ -145,6 +152,20 @@ async def score_quiz(
                     await db.commit()
             except Exception as exc:
                 logger.warning("Notion auto-export failed for module %s: %s", completing_module_id, exc)
+
+        # Generate knowledge graph recommendations
+        try:
+            await recommendation_service.generate_and_save_recommendations(
+                user_id=completing_user_id,
+                source_module_id=completing_module_id,
+                topic=completing_topic,
+                level=completing_level,
+                learned_concepts=completing_concept_titles,
+                user_interests=user.interest_topics or [] if user else [],
+                db=db,
+            )
+        except Exception as exc:
+            logger.warning("Recommendation generation failed for module %s: %s", completing_module_id, exc)
 
     # Fetch failed concept titles from the passages
     failed_concepts = []

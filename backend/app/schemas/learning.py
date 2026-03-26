@@ -7,6 +7,7 @@ from pydantic import BaseModel
 class StartModuleRequest(BaseModel):
     topic: str
     level: str
+    prerequisite_concepts: list[str] = []
 
 
 class PassageResponse(BaseModel):
@@ -133,3 +134,20 @@ class ModuleReviewResponse(BaseModel):
     quiz_total: int | None
     quiz_attempts: int | None
     questions: list[ReviewQuestionResponse]
+
+
+class ConceptNode(BaseModel):
+    concept: str
+    status: str  # "learned" | "recommended"
+    module_id: str | None = None
+    reason: str | None = None
+    prerequisite_concepts: list[str] = []
+
+
+class KnowledgeMapTopic(BaseModel):
+    topic: str
+    nodes: list[ConceptNode]
+
+
+class KnowledgeMapResponse(BaseModel):
+    topics: list[KnowledgeMapTopic]

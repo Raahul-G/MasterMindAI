@@ -131,3 +131,20 @@ export interface ModuleReview {
   quiz_attempts: number | null
   questions: ReviewQuestion[]
 }
+
+export interface ConceptNode {
+  concept: string
+  status: 'learned' | 'recommended'
+  module_id?: string
+  reason?: string
+  prerequisite_concepts?: string[]
+}
+
+export interface KnowledgeMapTopic {
+  topic: string
+  nodes: ConceptNode[]
+}
+
+export interface KnowledgeMapResponse {
+  topics: KnowledgeMapTopic[]
+}
