@@ -21,7 +21,7 @@ from app.schemas.learning import (
     SubmitQuizRequest,
     SubmitQuizResponse,
 )
-from app.services import learning_service, quiz_service
+from app.services import learning_service, quiz_service, recommendation_service
 
 router = APIRouter(prefix="/learn", tags=["learning"])
 
@@ -37,6 +37,15 @@ async def start_module(
     return await learning_service.start_module(
         data.topic, data.level, current_user, db, prerequisite_concepts=data.prerequisite_concepts or None
     )
+
+
+@router.post("/recommendations/backfill")
+async def backfill_recommendations(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    count = await recommendation_service.backfill_for_user(current_user.id, db)
+    return {"backfilled": count}
 
 
 @router.get("/knowledge-map", response_model=KnowledgeMapResponse)

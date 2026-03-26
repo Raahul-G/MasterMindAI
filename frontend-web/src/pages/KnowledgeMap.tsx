@@ -2,20 +2,39 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { getKnowledgeMap } from '../api/learning'
+import { getKnowledgeMap, backfillRecommendations } from '../api/learning'
 import type { KnowledgeMapTopic, ConceptNode } from '../types'
 
 export default function KnowledgeMap() {
   const [topics, setTopics] = useState<KnowledgeMapTopic[]>([])
   const [loading, setLoading] = useState(true)
+  const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
   useEffect(() => {
-    getKnowledgeMap()
-      .then(({ data }) => setTopics(data.topics))
-      .catch(() => setError('Failed to load knowledge map.'))
-      .finally(() => setLoading(false))
+    const load = async () => {
+      try {
+        const { data } = await getKnowledgeMap()
+        setTopics(data.topics)
+
+        const hasLearned = data.topics.some((t) => t.nodes.some((n) => n.status === 'learned'))
+        const hasRecommended = data.topics.some((t) => t.nodes.some((n) => n.status === 'recommended'))
+
+        if (hasLearned && !hasRecommended) {
+          setBackfilling(true)
+          await backfillRecommendations()
+          const { data: refreshed } = await getKnowledgeMap()
+          setTopics(refreshed.topics)
+          setBackfilling(false)
+        }
+      } catch {
+        setError('Failed to load knowledge map.')
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
   }, [])
 
   const handleStartRecommended = (node: ConceptNode) => {
@@ -36,6 +55,16 @@ export default function KnowledgeMap() {
 
         {loading && <LoadingSpinner />}
         {error && <p className="text-red-500 text-sm">{error}</p>}
+
+        {backfilling && (
+          <div className="flex items-center gap-3 text-sm text-purple-600 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 mb-6">
+            <svg className="animate-spin h-4 w-4 text-purple-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            Generating your recommendations...
+          </div>
+        )}
 
         {!loading && !error && topics.length === 0 && (
           <div className="text-center py-20 text-gray-400">

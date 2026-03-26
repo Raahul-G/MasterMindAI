@@ -18,3 +18,6 @@ export const remediate = (module_id: string, quiz_id: string, failed_concepts: s
 
 export const getKnowledgeMap = () =>
   axiosClient.get<KnowledgeMapResponse>('/learn/knowledge-map')
+
+export const backfillRecommendations = () =>
+  axiosClient.post<{ backfilled: number }>('/learn/recommendations/backfill')
