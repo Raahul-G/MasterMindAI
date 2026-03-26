@@ -17,24 +17,30 @@ export default function KnowledgeMap() {
       try {
         const { data } = await getKnowledgeMap()
         setTopics(data.topics)
+        setLoading(false)
 
         const hasLearned = data.topics.some((t) => t.nodes.some((n) => n.status === 'learned'))
         const hasRecommended = data.topics.some((t) => t.nodes.some((n) => n.status === 'recommended'))
 
         if (hasLearned && !hasRecommended) {
           setBackfilling(true)
-          await backfillRecommendations()
-          const { data: refreshed } = await getKnowledgeMap()
-          setTopics(refreshed.topics)
-          setBackfilling(false)
+          try {
+            await backfillRecommendations()
+            const { data: refreshed } = await getKnowledgeMap()
+            setTopics(refreshed.topics)
+          } catch {
+            // backfill failed silently — map still shows with learned concepts
+          } finally {
+            setBackfilling(false)
+          }
         }
       } catch {
         setError('Failed to load knowledge map.')
-      } finally {
         setLoading(false)
       }
     }
     load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleStartRecommended = (node: ConceptNode) => {
