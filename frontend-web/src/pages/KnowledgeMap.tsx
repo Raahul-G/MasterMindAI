@@ -19,10 +19,13 @@ export default function KnowledgeMap() {
         setTopics(data.topics)
         setLoading(false)
 
-        const hasLearned = data.topics.some((t) => t.nodes.some((n) => n.status === 'learned'))
-        const hasRecommended = data.topics.some((t) => t.nodes.some((n) => n.status === 'recommended'))
+        const needsBackfill = data.topics.some(
+          (t) =>
+            t.nodes.some((n) => n.status === 'learned') &&
+            !t.nodes.some((n) => n.status === 'recommended')
+        )
 
-        if (hasLearned && !hasRecommended) {
+        if (needsBackfill) {
           setBackfilling(true)
           try {
             await backfillRecommendations()
