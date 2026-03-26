@@ -48,7 +48,7 @@ export default function TopicSelection() {
         <p className="text-gray-400 mb-8">Pick any topic — AI will teach it to you step by step.</p>
 
         {prerequisiteConcepts.length > 0 && (
-          <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
+          <div className="mb-6 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3 text-sm text-purple-700">
             Builds on: <span className="font-semibold">{prerequisiteConcepts.join(', ')}</span>
           </div>
         )}

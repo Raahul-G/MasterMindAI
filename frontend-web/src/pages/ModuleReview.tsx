@@ -65,10 +65,10 @@ export default function ModuleReview() {
         </div>
 
         {/* ELI5 */}
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-6 flex gap-3 mt-4">
+        <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 mb-6 flex gap-3 mt-4">
           <span className="text-2xl">💡</span>
           <div>
-            <p className="text-xs font-bold text-blue-700 mb-1 uppercase tracking-wide">Simple Explanation</p>
+            <p className="text-xs font-bold text-purple-700 mb-1 uppercase tracking-wide">Simple Explanation</p>
             <p className="text-gray-700 leading-relaxed">{review.eli5_text}</p>
           </div>
         </div>

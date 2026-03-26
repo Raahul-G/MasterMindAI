@@ -129,17 +129,17 @@ export default function KnowledgeMap() {
                     {recommended.map((node) => (
                       <div
                         key={node.concept}
-                        className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3"
+                        className="flex items-start gap-3 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3"
                       >
-                        <span className="text-blue-400 text-lg mt-0.5">→</span>
+                        <span className="text-purple-400 text-lg mt-0.5">→</span>
                         <div className="flex-1">
-                          <p className="font-semibold text-blue-800 text-sm">{node.concept}</p>
+                          <p className="font-semibold text-purple-800 text-sm">{node.concept}</p>
                           {node.reason && (
-                            <p className="text-xs text-blue-600 mt-0.5">{node.reason}</p>
+                            <p className="text-xs text-purple-600 mt-0.5">{node.reason}</p>
                           )}
                           <button
                             onClick={() => handleStartRecommended(node)}
-                            className="mt-2 text-xs font-bold bg-blue-600 text-white px-3 py-1.5 rounded-lg border-b-2 border-blue-700 hover:bg-blue-700 active:translate-y-[1px] active:border-b-[1px] transition-[transform,border-bottom-width] duration-75"
+                            className="mt-2 text-xs font-bold bg-purple-600 text-white px-3 py-1.5 rounded-lg border-b-2 border-purple-700 hover:bg-purple-700 active:translate-y-[1px] active:border-b-[1px] transition-[transform,border-bottom-width] duration-75"
                           >
                             Start Learning
                           </button>

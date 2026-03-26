@@ -15,10 +15,11 @@ export default function Navbar() {
       <Link to="/dashboard" className="text-2xl text-purple-600" style={{ fontFamily: "'Righteous', cursive" }}>MasterMind AI 🧠</Link>
       {user && (
         <div className="flex items-center gap-4">
-          <Link to="/knowledge-map" className="text-sm text-gray-500 hover:text-purple-600">Map</Link>
-          <Link to="/friends" className="text-sm text-gray-500 hover:text-green-600">Friends</Link>
+          <Link to="/dashboard" className="text-sm text-gray-500 hover:text-purple-600">🚀 Dashboard</Link>
+          <Link to="/knowledge-map" className="text-sm text-gray-500 hover:text-purple-600">🗺️ Map</Link>
+          <Link to="/friends" className="text-sm text-gray-500 hover:text-green-600">🫂 Friends</Link>
           <Link to="/profile" className="text-sm text-gray-600 hover:text-green-600">{user.full_name}</Link>
-          <button onClick={logout} className="text-sm text-gray-400 hover:text-red-500">Logout</button>
+          <button onClick={logout} className="text-sm text-gray-400 hover:text-red-500">📤 Logout</button>
         </div>
       )}
     </nav>
