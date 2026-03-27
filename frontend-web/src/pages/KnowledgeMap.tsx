@@ -95,7 +95,7 @@ export default function KnowledgeMap() {
         const x2 = t.left + t.width / 2 - cRect.left
         const y2 = t.top - cRect.top
         const mid = (y1 + y2) / 2
-        return [{ x1, y1, x2, y2, cp1x: x1, cp1y: mid, cp2x: x2, cp2y: mid, sameDomain: true, type: edge.relationship_type }]
+        return [{ x1, y1, x2, y2, cp1x: x1, cp1y: mid, cp2x: x2, cp2y: mid, sameDomain, type: edge.relationship_type }]
       } else {
         // Horizontal bezier: right-center of source → left-center of target
         const x1 = s.right - cRect.left
@@ -103,7 +103,7 @@ export default function KnowledgeMap() {
         const x2 = t.left - cRect.left
         const y2 = t.top + t.height / 2 - cRect.top
         const cpOffset = Math.abs(x2 - x1) * 0.4
-        return [{ x1, y1, x2, y2, cp1x: x1 + cpOffset, cp1y: y1, cp2x: x2 - cpOffset, cp2y: y2, sameDomain: false, type: edge.relationship_type }]
+        return [{ x1, y1, x2, y2, cp1x: x1 + cpOffset, cp1y: y1, cp2x: x2 - cpOffset, cp2y: y2, sameDomain, type: edge.relationship_type }]
       }
     })
 
