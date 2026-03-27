@@ -37,11 +37,14 @@ export default function KnowledgeMap() {
       setEdges(data.edges ?? [])
       setLoading(false)
 
-      const needsBackfill = (data.domains ?? []).some(
-        (d) =>
-          d.nodes.some((n) => n.status === 'learned') &&
-          !d.nodes.some((n) => n.status === 'recommended')
-      )
+      const resolvedDomains = data.domains ?? []
+      const needsBackfill =
+        resolvedDomains.length === 0 ||
+        resolvedDomains.some(
+          (d) =>
+            d.nodes.some((n) => n.status === 'learned') &&
+            !d.nodes.some((n) => n.status === 'recommended')
+        )
 
       if (needsBackfill) {
         setBackfilling(true)
