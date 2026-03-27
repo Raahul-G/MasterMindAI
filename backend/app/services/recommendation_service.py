@@ -13,6 +13,7 @@ import uuid
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.learning import Module, Passage, TopicEdge, TopicNode
@@ -69,8 +70,20 @@ async def create_or_update_topic_node(
             status=status,
         )
         db.add(node)
-        await db.commit()
-        await db.refresh(node)
+        try:
+            await db.commit()
+            await db.refresh(node)
+        except IntegrityError:
+            # Another concurrent request already created the same node — fetch it
+            await db.rollback()
+            node_result = await db.execute(
+                select(TopicNode).where(
+                    TopicNode.user_id == user_id,
+                    TopicNode.canonical_name == canonical_name,
+                )
+            )
+            node = node_result.scalar_one()
+            logger.info("Topic node race condition resolved for user=%s canonical='%s'", user_id, canonical_name)
 
     logger.info("Topic node upserted: user=%s canonical='%s' status=%s", user_id, canonical_name, status)
     return node

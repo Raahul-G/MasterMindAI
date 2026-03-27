@@ -1,3 +1,5 @@
+import uuid
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
@@ -72,7 +74,7 @@ async def google_login(id_token: str, db: AsyncSession) -> str:
     return create_access_token(user.id)
 
 
-async def save_interests(user_id: str, interests: list[str], db: AsyncSession) -> None:
+async def save_interests(user_id: uuid.UUID, interests: list[str], db: AsyncSession) -> None:
     """Saves the user's personal interest topics after onboarding."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

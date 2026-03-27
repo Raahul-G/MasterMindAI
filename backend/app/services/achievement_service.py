@@ -44,7 +44,7 @@ async def check_and_award_achievements(
     Called automatically after a module is completed.
     """
     count_result = await db.execute(
-        select(func.count()).where(
+        select(func.count()).select_from(Module).where(
             Module.user_id == user_id,
             Module.status == "completed",
         )

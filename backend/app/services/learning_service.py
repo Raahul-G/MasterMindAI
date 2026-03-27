@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import HTTPException
 from app.models.learning import Module, Passage, Question, Quiz, Remediation
 from app.models.user import User
 from app.schemas.learning import (
@@ -93,7 +94,9 @@ async def generate_quiz_for_module(
     passages = passage_result.scalars().all()
 
     module_result = await db.execute(select(Module).where(Module.id == module_id))
-    module = module_result.scalar_one()
+    module = module_result.scalar_one_or_none()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
 
     passages_content = [{"concept_title": p.concept_title, "content": p.content} for p in passages]
     raw_questions = await ai_service.generate_quiz(module.topic, passages_content, module.level)
@@ -157,7 +160,9 @@ async def remediate(
     4. Returns the new explanations
     """
     module_result = await db.execute(select(Module).where(Module.id == module_id))
-    module = module_result.scalar_one()
+    module = module_result.scalar_one_or_none()
+    if not module:
+        raise HTTPException(status_code=404, detail="Module not found")
 
     passage_result = await db.execute(select(Passage).where(Passage.module_id == module_id))
     passages = passage_result.scalars().all()

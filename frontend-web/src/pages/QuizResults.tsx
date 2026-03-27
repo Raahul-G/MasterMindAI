@@ -75,7 +75,7 @@ export default function QuizResults() {
             onClick={handleRemediate}
             className="w-full bg-green-600 text-white font-extrabold py-4 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight text-lg"
           >
-            Review &amp; Retake
+            Review & Retake
           </button>
         )}
       </div>

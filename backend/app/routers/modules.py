@@ -187,7 +187,9 @@ async def export_notion(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Notion API error: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error("Notion API error for module %s: %s", module_id, e)
+        raise HTTPException(status_code=502, detail="Failed to export to Notion. Please try again.")
 
     module.notion_page_id = page_url.split("/")[-1]
     await db.commit()

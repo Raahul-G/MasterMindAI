@@ -61,7 +61,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl font-bold text-forest-900">
-              Welcome back{user ? `, ${user.full_name.split(' ')[0]}` : ''}!
+              Welcome back{user ? `, ${user.full_name?.split(' ')[0] ?? 'there'}` : ''}!
             </h1>
             <p className="text-gray-400 text-sm mt-1">Pick up where you left off or start something new.</p>
           </div>
