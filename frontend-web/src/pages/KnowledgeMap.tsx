@@ -33,11 +33,11 @@ export default function KnowledgeMap() {
   const load = async () => {
     try {
       const { data } = await getKnowledgeMap()
-      setDomains(data.domains)
-      setEdges(data.edges)
+      setDomains(data.domains ?? [])
+      setEdges(data.edges ?? [])
       setLoading(false)
 
-      const needsBackfill = data.domains.some(
+      const needsBackfill = (data.domains ?? []).some(
         (d) =>
           d.nodes.some((n) => n.status === 'learned') &&
           !d.nodes.some((n) => n.status === 'recommended')
@@ -48,8 +48,8 @@ export default function KnowledgeMap() {
         try {
           await backfillRecommendations()
           const { data: refreshed } = await getKnowledgeMap()
-          setDomains(refreshed.domains)
-          setEdges(refreshed.edges)
+          setDomains(refreshed.domains ?? [])
+          setEdges(refreshed.edges ?? [])
         } catch {
           // backfill failed silently
         } finally {
