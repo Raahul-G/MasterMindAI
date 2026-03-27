@@ -6,12 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.dependencies import get_current_user
-from app.models.learning import ConceptGraph, Module, Passage
+from app.models.learning import ConceptGraph, Module, Passage, TopicEdge, TopicNode
 from app.models.user import User
 from app.schemas.learning import (
     ConceptNode,
     GenerateQuizRequest,
     GenerateQuizResponse,
+    KnowledgeDomain,
+    KnowledgeGraphResponse,
     KnowledgeMapResponse,
     KnowledgeMapTopic,
     RemediateRequest,
@@ -20,6 +22,8 @@ from app.schemas.learning import (
     StartModuleResponse,
     SubmitQuizRequest,
     SubmitQuizResponse,
+    TopicEdgeResponse,
+    TopicNodeResponse,
 )
 from app.services import learning_service, quiz_service, recommendation_service
 
@@ -48,78 +52,54 @@ async def backfill_recommendations(
     return {"backfilled": count}
 
 
-@router.get("/knowledge-map", response_model=KnowledgeMapResponse)
+@router.get("/knowledge-map", response_model=KnowledgeGraphResponse)
 async def get_knowledge_map(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Fetch all completed modules for this user
-    modules_result = await db.execute(
-        select(Module).where(Module.user_id == current_user.id, Module.status == "completed")
+    # Fetch all topic_nodes for this user
+    nodes_result = await db.execute(
+        select(TopicNode).where(TopicNode.user_id == current_user.id)
     )
-    completed_modules = modules_result.scalars().all()
+    nodes = nodes_result.scalars().all()
 
-    # Build module_id → topic map
-    module_map = {m.id: m.topic for m in completed_modules}
+    # Fetch all topic_edges for this user
+    edges_result = await db.execute(
+        select(TopicEdge).where(TopicEdge.user_id == current_user.id)
+    )
+    edges = edges_result.scalars().all()
 
-    # Fetch all passages for completed modules
-    if completed_modules:
-        module_ids = [m.id for m in completed_modules]
-        passages_result = await db.execute(
-            select(Passage).where(Passage.module_id.in_(module_ids))
-        )
-        passages = passages_result.scalars().all()
-    else:
-        passages = []
-
-    # Group learned concepts by topic
-    topic_learned: dict[str, list[ConceptNode]] = defaultdict(list)
-    for p in passages:
-        topic = module_map.get(p.module_id, "Unknown")
-        topic_learned[topic].append(ConceptNode(
-            concept=p.concept_title,
-            status="learned",
-            module_id=str(p.module_id),
+    # Group nodes by domain
+    domain_map: dict[str, list[TopicNodeResponse]] = defaultdict(list)
+    for node in nodes:
+        domain_key = node.domain or "General"
+        hints = node.concept_hints if isinstance(node.concept_hints, list) else None
+        domain_map[domain_key].append(TopicNodeResponse(
+            id=str(node.id),
+            canonical_name=node.canonical_name,
+            display_name=node.display_name,
+            domain=node.domain,
+            status=node.status,
+            source_module_id=str(node.source_module_id) if node.source_module_id else None,
+            concept_hints=hints,
+            reason=node.reason,
         ))
 
-    # Fetch all concept graph entries for this user
-    graph_result = await db.execute(
-        select(ConceptGraph).where(ConceptGraph.user_id == current_user.id)
-    )
-    graph_entries = graph_result.scalars().all()
+    domains = [
+        KnowledgeDomain(name=name, nodes=domain_nodes)
+        for name, domain_nodes in sorted(domain_map.items())
+    ]
 
-    # Collect all learned concept titles per topic (for deduplication)
-    learned_titles_by_topic: dict[str, set[str]] = defaultdict(set)
-    for topic, nodes in topic_learned.items():
-        for node in nodes:
-            learned_titles_by_topic[topic].add(node.concept)
+    edge_responses = [
+        TopicEdgeResponse(
+            source_id=str(e.source_node_id),
+            target_id=str(e.target_node_id),
+            relationship_type=e.relationship_type,
+        )
+        for e in edges
+    ]
 
-    # Add recommended concepts (deduplicated against learned)
-    topic_recommended: dict[str, list[ConceptNode]] = defaultdict(list)
-    seen_recommendations: dict[str, set[str]] = defaultdict(set)
-
-    for entry in sorted(graph_entries, key=lambda e: e.created_at):
-        topic = entry.topic
-        learned_set = learned_titles_by_topic.get(topic, set())
-        for rec in (entry.recommended_concepts or []):
-            title = rec.get("title", "")
-            if title and title not in learned_set and title not in seen_recommendations[topic]:
-                seen_recommendations[topic].add(title)
-                topic_recommended[topic].append(ConceptNode(
-                    concept=title,
-                    status="recommended",
-                    reason=rec.get("reason"),
-                    prerequisite_concepts=entry.learned_concepts or [],
-                ))
-
-    # Merge into final response
-    all_topics = set(topic_learned.keys()) | set(topic_recommended.keys())
-    topics = []
-    for topic in sorted(all_topics):
-        nodes = topic_learned.get(topic, []) + topic_recommended.get(topic, [])
-        topics.append(KnowledgeMapTopic(topic=topic, nodes=nodes))
-
-    return KnowledgeMapResponse(topics=topics)
+    return KnowledgeGraphResponse(domains=domains, edges=edge_responses)
 
 
 @router.post("/quiz/generate", response_model=GenerateQuizResponse)

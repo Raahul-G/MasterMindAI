@@ -1,12 +1,28 @@
 import logging
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.routers import auth, gamification, learning, modules, notion, social
 
 logger = logging.getLogger(__name__)
+
+_HTTP_CODE_NAMES: dict[int, str] = {
+    400: "bad_request",
+    401: "unauthorized",
+    403: "forbidden",
+    404: "not_found",
+    405: "method_not_allowed",
+    409: "conflict",
+    422: "validation_error",
+    429: "rate_limited",
+    500: "internal_error",
+    502: "bad_gateway",
+    503: "service_unavailable",
+}
 
 app = FastAPI(title="MasterMind API", version="0.1.0")
 
@@ -17,6 +33,31 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    code = _HTTP_CODE_NAMES.get(exc.status_code, "error")
+    detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": code, "message": detail}},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    # Produce a single readable message from the first validation error
+    first = errors[0] if errors else {}
+    field = " → ".join(str(loc) for loc in first.get("loc", []))
+    msg = first.get("msg", "Invalid input")
+    message = f"{field}: {msg}" if field else msg
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": "validation_error", "message": message}},
+    )
+
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):

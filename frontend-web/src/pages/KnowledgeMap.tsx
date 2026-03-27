@@ -1,64 +1,124 @@
-import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { getKnowledgeMap, backfillRecommendations } from '../api/learning'
-import type { KnowledgeMapTopic, ConceptNode } from '../types'
+import type { KnowledgeDomain, TopicEdge, TopicNode } from '../types'
+
+interface LineCoord {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  cp1x: number
+  cp1y: number
+  cp2x: number
+  cp2y: number
+  sameDomain: boolean
+  type: string
+}
 
 export default function KnowledgeMap() {
-  const [topics, setTopics] = useState<KnowledgeMapTopic[]>([])
+  const [domains, setDomains] = useState<KnowledgeDomain[]>([])
+  const [edges, setEdges] = useState<TopicEdge[]>([])
+  const [lines, setLines] = useState<LineCoord[]>([])
   const [loading, setLoading] = useState(true)
   const [backfilling, setBackfilling] = useState(false)
   const [error, setError] = useState('')
   const navigate = useNavigate()
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data } = await getKnowledgeMap()
-        setTopics(data.topics)
-        setLoading(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-        const needsBackfill = data.topics.some(
-          (t) =>
-            t.nodes.some((n) => n.status === 'learned') &&
-            !t.nodes.some((n) => n.status === 'recommended')
-        )
+  const load = async () => {
+    try {
+      const { data } = await getKnowledgeMap()
+      setDomains(data.domains)
+      setEdges(data.edges)
+      setLoading(false)
 
-        if (needsBackfill) {
-          setBackfilling(true)
-          try {
-            await backfillRecommendations()
-            const { data: refreshed } = await getKnowledgeMap()
-            setTopics(refreshed.topics)
-          } catch {
-            // backfill failed silently — map still shows with learned concepts
-          } finally {
-            setBackfilling(false)
-          }
+      const needsBackfill = data.domains.some(
+        (d) =>
+          d.nodes.some((n) => n.status === 'learned') &&
+          !d.nodes.some((n) => n.status === 'recommended')
+      )
+
+      if (needsBackfill) {
+        setBackfilling(true)
+        try {
+          await backfillRecommendations()
+          const { data: refreshed } = await getKnowledgeMap()
+          setDomains(refreshed.domains)
+          setEdges(refreshed.edges)
+        } catch {
+          // backfill failed silently
+        } finally {
+          setBackfilling(false)
         }
-      } catch {
-        setError('Failed to load knowledge map.')
-        setLoading(false)
       }
+    } catch {
+      setError('Failed to load knowledge map.')
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     load()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleStartRecommended = (node: ConceptNode) => {
+  useLayoutEffect(() => {
+    const container = containerRef.current
+    if (!container || edges.length === 0) return
+
+    const cRect = container.getBoundingClientRect()
+
+    const computed: LineCoord[] = edges.flatMap((edge) => {
+      const srcEl = nodeRefs.current[edge.source_id]
+      const tgtEl = nodeRefs.current[edge.target_id]
+      if (!srcEl || !tgtEl) return []
+
+      const s = srcEl.getBoundingClientRect()
+      const t = tgtEl.getBoundingClientRect()
+
+      const srcDomain = srcEl.closest('[data-domain]')?.getAttribute('data-domain')
+      const tgtDomain = tgtEl.closest('[data-domain]')?.getAttribute('data-domain')
+      const sameDomain = srcDomain === tgtDomain
+
+      if (sameDomain) {
+        // Vertical arrow: bottom-center of source → top-center of target
+        const x1 = s.left + s.width / 2 - cRect.left
+        const y1 = s.bottom - cRect.top
+        const x2 = t.left + t.width / 2 - cRect.left
+        const y2 = t.top - cRect.top
+        const mid = (y1 + y2) / 2
+        return [{ x1, y1, x2, y2, cp1x: x1, cp1y: mid, cp2x: x2, cp2y: mid, sameDomain: true, type: edge.relationship_type }]
+      } else {
+        // Horizontal bezier: right-center of source → left-center of target
+        const x1 = s.right - cRect.left
+        const y1 = s.top + s.height / 2 - cRect.top
+        const x2 = t.left - cRect.left
+        const y2 = t.top + t.height / 2 - cRect.top
+        const cpOffset = Math.abs(x2 - x1) * 0.4
+        return [{ x1, y1, x2, y2, cp1x: x1 + cpOffset, cp1y: y1, cp2x: x2 - cpOffset, cp2y: y2, sameDomain: false, type: edge.relationship_type }]
+      }
+    })
+
+    setLines(computed)
+  }, [domains, edges])
+
+  const handleStartRecommended = (node: TopicNode) => {
     navigate('/learn/start', {
-      state: {
-        topic: node.concept,
-        prerequisite_concepts: node.prerequisite_concepts ?? [],
-      },
+      state: { topic: node.canonical_name },
     })
   }
+
+  const allNodes = domains.flatMap((d) => d.nodes)
 
   return (
     <>
       <Navbar />
-      <div className="max-w-3xl mx-auto px-6 py-10">
+      <div className="max-w-5xl mx-auto px-6 py-10">
         <h1 className="text-3xl font-extrabold text-gray-900 mb-1">Knowledge Map</h1>
         <p className="text-gray-400 mb-8 text-sm">Your learning history and what to unlock next.</p>
 
@@ -75,7 +135,7 @@ export default function KnowledgeMap() {
           </div>
         )}
 
-        {!loading && !error && topics.length === 0 && (
+        {!loading && !error && allNodes.length === 0 && (
           <div className="text-center py-20 text-gray-400">
             <p className="text-5xl mb-4">🗺️</p>
             <p className="text-lg font-semibold text-gray-600 mb-2">Your map is empty</p>
@@ -89,73 +149,153 @@ export default function KnowledgeMap() {
           </div>
         )}
 
-        {topics.map((t) => {
-          const learned = t.nodes.filter((n) => n.status === 'learned')
-          const recommended = t.nodes.filter((n) => n.status === 'recommended')
-          return (
-            <div key={t.topic} className="mb-10">
-              <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="text-purple-500">📚</span> {t.topic}
-              </h2>
+        {allNodes.length > 0 && (
+          <div className="relative" ref={containerRef}>
+            {/* SVG overlay for arrows */}
+            <svg
+              style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
+              width="100%"
+              height="100%"
+            >
+              <defs>
+                <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L8,3 z" fill="#a855f7" />
+                </marker>
+                <marker id="arrow-green" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                  <path d="M0,0 L0,6 L8,3 z" fill="#22c55e" />
+                </marker>
+              </defs>
+              {lines.map((l, i) =>
+                l.sameDomain ? (
+                  <line
+                    key={i}
+                    x1={l.x1}
+                    y1={l.y1}
+                    x2={l.x2}
+                    y2={l.y2}
+                    stroke="#a855f7"
+                    strokeWidth="2"
+                    markerEnd="url(#arrow)"
+                  />
+                ) : (
+                  <path
+                    key={i}
+                    d={`M${l.x1},${l.y1} C${l.cp1x},${l.cp1y} ${l.cp2x},${l.cp2y} ${l.x2},${l.y2}`}
+                    stroke="#22c55e"
+                    strokeWidth="1.5"
+                    strokeDasharray="6 3"
+                    fill="none"
+                    markerEnd="url(#arrow-green)"
+                  />
+                )
+              )}
+            </svg>
 
-              {learned.length > 0 && (
-                <div className="mb-4">
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Learned</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {learned.map((node) => (
-                      <div
-                        key={node.concept}
-                        className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3"
-                      >
-                        <span className="text-green-500 text-lg mt-0.5">✓</span>
-                        <div>
-                          <p className="font-semibold text-green-800 text-sm">{node.concept}</p>
-                          {node.module_id && (
-                            <Link
-                              to={`/modules/${node.module_id}/review`}
-                              className="text-xs text-green-600 hover:underline"
-                            >
-                              Review module
-                            </Link>
-                          )}
-                        </div>
-                      </div>
+            {/* Domain columns */}
+            <div className="flex flex-col md:flex-row gap-8">
+              {domains.map((domain) => (
+                <div
+                  key={domain.name}
+                  data-domain={domain.name}
+                  className="flex-1 min-w-0"
+                >
+                  <h2 className="text-base font-bold text-gray-700 mb-4 flex items-center gap-2">
+                    <span className="text-purple-500">📚</span> {domain.name}
+                  </h2>
+                  <div className="flex flex-col gap-3">
+                    {domain.nodes.map((node) => (
+                      <NodeCard
+                        key={node.id}
+                        node={node}
+                        refCallback={(el) => { nodeRefs.current[node.id] = el }}
+                        onStart={handleStartRecommended}
+                      />
                     ))}
                   </div>
                 </div>
-              )}
-
-              {recommended.length > 0 && (
-                <div>
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Unlock Next</p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {recommended.map((node) => (
-                      <div
-                        key={node.concept}
-                        className="flex items-start gap-3 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3"
-                      >
-                        <span className="text-purple-400 text-lg mt-0.5">→</span>
-                        <div className="flex-1">
-                          <p className="font-semibold text-purple-800 text-sm">{node.concept}</p>
-                          {node.reason && (
-                            <p className="text-xs text-purple-600 mt-0.5">{node.reason}</p>
-                          )}
-                          <button
-                            onClick={() => handleStartRecommended(node)}
-                            className="mt-2 text-xs font-bold bg-purple-600 text-white px-3 py-1.5 rounded-lg border-b-2 border-purple-700 hover:bg-purple-700 active:translate-y-[1px] active:border-b-[1px] transition-[transform,border-bottom-width] duration-75"
-                          >
-                            Start Learning
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              ))}
             </div>
-          )
-        })}
+          </div>
+        )}
       </div>
     </>
+  )
+}
+
+function NodeCard({
+  node,
+  refCallback,
+  onStart,
+}: {
+  node: TopicNode
+  refCallback: (el: HTMLDivElement | null) => void
+  onStart: (node: TopicNode) => void
+}) {
+  if (node.status === 'in_progress') {
+    return (
+      <div
+        ref={refCallback}
+        className="flex items-start gap-3 bg-gray-50 border border-gray-300 rounded-xl px-4 py-3"
+      >
+        <span className="text-gray-400 text-lg mt-0.5">○</span>
+        <div>
+          <p className="font-semibold text-gray-500 text-sm">{node.display_name}</p>
+          <p className="text-xs text-gray-400">In progress</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (node.status === 'learned') {
+    return (
+      <div
+        ref={refCallback}
+        className="flex items-start gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3"
+      >
+        <span className="text-green-500 text-lg mt-0.5">✓</span>
+        <div>
+          <p className="font-semibold text-green-800 text-sm">{node.display_name}</p>
+          {node.source_module_id && (
+            <Link
+              to={`/modules/${node.source_module_id}/review`}
+              className="text-xs text-green-600 hover:underline"
+            >
+              Review module
+            </Link>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // recommended
+  return (
+    <div
+      ref={refCallback}
+      className="flex items-start gap-3 bg-purple-50 border border-purple-200 rounded-xl px-4 py-3"
+    >
+      <span className="text-purple-400 text-lg mt-0.5">→</span>
+      <div className="flex-1">
+        <p className="font-semibold text-purple-800 text-sm">{node.display_name}</p>
+        {node.reason && (
+          <p className="text-xs text-purple-600 mt-0.5">{node.reason}</p>
+        )}
+        {node.concept_hints && node.concept_hints.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {node.concept_hints.map((hint, i) => (
+              <span key={i} className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">
+                {hint}
+              </span>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => onStart(node)}
+          className="mt-2 text-xs font-bold bg-purple-600 text-white px-3 py-1.5 rounded-lg border-b-2 border-purple-700 hover:bg-purple-700 active:translate-y-[1px] active:border-b-[1px] transition-[transform,border-bottom-width] duration-75"
+        >
+          Start Learning
+        </button>
+      </div>
+    </div>
   )
 }

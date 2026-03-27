@@ -15,13 +15,17 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Convert async URL to sync psycopg2 URL for Alembic
-# asyncpg uses ?ssl=require; psycopg2 uses ?sslmode=require
+# Convert async URL to sync psycopg2 URL for Alembic.
+# Also handles Supabase Transaction Pooler (port 6543) by appending ?sslmode=require.
 sync_url = (
     settings.DATABASE_URL
     .replace("postgresql+asyncpg://", "postgresql://")
     .replace("?ssl=require", "?sslmode=require")
 )
+# Supabase pooler (port 6543) requires SSL; add sslmode if not already present
+if ":6543/" in sync_url and "sslmode" not in sync_url:
+    sep = "&" if "?" in sync_url else "?"
+    sync_url = sync_url + sep + "sslmode=require"
 config.set_main_option("sqlalchemy.url", sync_url)
 
 

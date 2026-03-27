@@ -151,3 +151,30 @@ class KnowledgeMapTopic(BaseModel):
 
 class KnowledgeMapResponse(BaseModel):
     topics: list[KnowledgeMapTopic]
+
+
+class TopicNodeResponse(BaseModel):
+    id: str
+    canonical_name: str
+    display_name: str
+    domain: str | None
+    status: str
+    source_module_id: str | None
+    concept_hints: list[str] | None
+    reason: str | None
+
+
+class TopicEdgeResponse(BaseModel):
+    source_id: str
+    target_id: str
+    relationship_type: str
+
+
+class KnowledgeDomain(BaseModel):
+    name: str
+    nodes: list[TopicNodeResponse]
+
+
+class KnowledgeGraphResponse(BaseModel):
+    domains: list[KnowledgeDomain]
+    edges: list[TopicEdgeResponse]

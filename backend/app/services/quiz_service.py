@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
+from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation, TopicNode
 from app.models.user import User
 from app.schemas.learning import AnswerSubmission
 from app.services import achievement_service, feed_service, notion_service, recommendation_service, streak_service
@@ -62,6 +62,8 @@ async def score_quiz(
     completing_score = correct_count
     completing_total = total
     completing_concept_titles: list[str] = []
+    completing_canonical: str | None = None
+    completing_domain: str | None = None
     is_first_attempt_perfect = False
 
     quiz_result = await db.execute(select(Quiz).where(Quiz.id == quiz_id))
@@ -91,6 +93,14 @@ async def score_quiz(
                     select(Passage).where(Passage.module_id == module.id).order_by(Passage.order_index)
                 )
                 completing_concept_titles = [p.concept_title for p in passage_result.scalars().all()]
+
+                # Fetch canonical_name from topic_nodes before commit
+                node_result = await db.execute(
+                    select(TopicNode).where(TopicNode.source_module_id == module.id)
+                )
+                completing_node = node_result.scalar_one_or_none()
+                completing_canonical = completing_node.canonical_name if completing_node else completing_topic
+                completing_domain = completing_node.domain if completing_node else None
 
     await db.commit()
 
@@ -153,12 +163,17 @@ async def score_quiz(
             except Exception as exc:
                 logger.warning("Notion auto-export failed for module %s: %s", completing_module_id, exc)
 
-        # Generate knowledge graph recommendations
+        # Update topic node status to learned and generate recommendations
         try:
+            await recommendation_service.complete_topic_node(
+                completing_user_id, completing_canonical or completing_topic, db
+            )
             await recommendation_service.generate_and_save_recommendations(
                 user_id=completing_user_id,
                 source_module_id=completing_module_id,
                 topic=completing_topic,
+                canonical_name=completing_canonical or completing_topic,
+                domain=completing_domain,
                 level=completing_level,
                 learned_concepts=completing_concept_titles,
                 user_interests=user.interest_topics or [] if user else [],

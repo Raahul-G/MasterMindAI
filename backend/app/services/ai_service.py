@@ -33,6 +33,11 @@ class LearningState(TypedDict, total=False):
     prerequisite_concepts: list[str]
     learned_concepts: list[str]
     recommended_concepts: list[dict]
+    existing_topics: list[str]
+    canonical_name: str
+    domain: str
+    module_recommendations: list[dict]
+    topic_connections: list[dict]
 
 
 # ---------------------------------------------------------------------------
@@ -223,6 +228,83 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
     return {"remediations": json.loads(response.content.strip())}
 
 
+async def _normalize_topic_node(state: LearningState) -> dict:
+    topic = state["topic"]
+    existing_topics = state.get("existing_topics") or []
+    existing_str = ", ".join(existing_topics) if existing_topics else "none"
+
+    prompt = f"""Topic typed by user: "{topic}"
+Existing canonical topics the user has studied: [{existing_str}]
+
+1. If this topic matches an existing one (same concept, different phrasing), return that exact canonical name.
+2. Otherwise return a clean canonical name (e.g. "REST API" not "Rest Api").
+3. Assign a short domain label (e.g. "Web APIs", "AI / ML", "System Design").
+
+Return JSON only: {{"canonical_name": "<str>", "domain": "<str>"}}
+No explanation, no markdown fences."""
+
+    llm = get_llm(temperature=0.3, max_tokens=150)
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    return json.loads(response.content.strip())
+
+
+async def _module_recommendations_node(state: LearningState) -> dict:
+    canonical_name = state["canonical_name"]
+    domain = state.get("domain", "")
+    level = state.get("level", "intermediate")
+    learned_concepts = state.get("learned_concepts") or []
+    user_interests = state.get("user_interests") or []
+    existing_topics = state.get("existing_topics") or []
+
+    learned_str = ", ".join(learned_concepts) if learned_concepts else "none"
+    interests_str = ", ".join(user_interests) if user_interests else "general learning"
+    existing_str = ", ".join(existing_topics) if existing_topics else "none"
+
+    prompt = f"""The user just mastered "{canonical_name}" (domain: {domain}) at {level} level.
+Concepts they learned: {learned_str}
+Their interests: {interests_str}
+All topics they have studied so far: [{existing_str}]
+
+Suggest 1-2 next MODULES to learn that directly build on "{canonical_name}".
+Each module should have 2 concept hints (short strings, not sentences).
+Do not suggest topics already in the existing_topics list.
+
+Return JSON only:
+[{{"topic": "<str>", "canonical_name": "<str>", "domain": "<str>", "concept_hints": ["<str>", "<str>"], "reason": "<one sentence>"}}]
+No explanation, no markdown fences."""
+
+    llm = get_llm(temperature=0.6, max_tokens=400)
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    return {"module_recommendations": json.loads(response.content.strip())}
+
+
+async def _topic_connections_node(state: LearningState) -> dict:
+    canonical_name = state["canonical_name"]
+    domain = state.get("domain", "")
+    existing_topics = state.get("existing_topics") or []
+
+    if not existing_topics:
+        return {"topic_connections": []}
+
+    existing_str = ", ".join(existing_topics)
+
+    prompt = f"""New topic the user just learned: "{canonical_name}" (domain: {domain})
+All other topics the user has studied: [{existing_str}]
+
+Which existing topics are meaningfully connected to "{canonical_name}"?
+Think like a knowledge graph — include prerequisite, extends, and related relationships.
+Only include real, non-trivial connections.
+
+Return JSON only (empty array if none):
+[{{"source": "<canonical_name>", "target": "<canonical_name>", "relationship": "prerequisite"|"extends"|"related"}}]
+where source and target are canonical topic names.
+No explanation, no markdown fences."""
+
+    llm = get_llm(temperature=0.3, max_tokens=300)
+    response = await llm.ainvoke([HumanMessage(content=prompt)])
+    return {"topic_connections": json.loads(response.content.strip())}
+
+
 async def _recommendation_node(state: LearningState) -> dict:
     topic = state["topic"]
     level = state["level"]
@@ -307,11 +389,38 @@ def _build_recommendation_graph():
     return g.compile()
 
 
+def _build_normalize_topic_graph():
+    g = StateGraph(LearningState)
+    g.add_node("normalize_topic", _normalize_topic_node)
+    g.add_edge(START, "normalize_topic")
+    g.add_edge("normalize_topic", END)
+    return g.compile()
+
+
+def _build_module_recommendations_graph():
+    g = StateGraph(LearningState)
+    g.add_node("module_recommendations", _module_recommendations_node)
+    g.add_edge(START, "module_recommendations")
+    g.add_edge("module_recommendations", END)
+    return g.compile()
+
+
+def _build_topic_connections_graph():
+    g = StateGraph(LearningState)
+    g.add_node("topic_connections", _topic_connections_node)
+    g.add_edge(START, "topic_connections")
+    g.add_edge("topic_connections", END)
+    return g.compile()
+
+
 _eli5_graph = _build_eli5_graph()
 _passages_graph = _build_passages_graph()
 _quiz_graph = _build_quiz_graph()
 _remediation_graph = _build_remediation_graph()
 _recommendation_graph = _build_recommendation_graph()
+_normalize_topic_graph = _build_normalize_topic_graph()
+_module_recommendations_graph = _build_module_recommendations_graph()
+_topic_connections_graph = _build_topic_connections_graph()
 
 
 # ---------------------------------------------------------------------------
@@ -377,3 +486,43 @@ async def generate_concept_recommendations(
         "user_interests": user_interests,
     })
     return result["recommended_concepts"]
+
+
+async def normalize_topic(topic: str, existing_topics: list[str]) -> dict:
+    result = await _normalize_topic_graph.ainvoke({
+        "topic": topic,
+        "existing_topics": existing_topics,
+    })
+    return {"canonical_name": result.get("canonical_name", topic), "domain": result.get("domain")}
+
+
+async def generate_module_recommendations(
+    canonical_name: str,
+    domain: str | None,
+    level: str,
+    learned_concepts: list[str],
+    user_interests: list[str],
+    existing_topics: list[str],
+) -> list[dict]:
+    result = await _module_recommendations_graph.ainvoke({
+        "canonical_name": canonical_name,
+        "domain": domain or "",
+        "level": level,
+        "learned_concepts": learned_concepts,
+        "user_interests": user_interests,
+        "existing_topics": existing_topics,
+    })
+    return result.get("module_recommendations", [])
+
+
+async def detect_topic_connections(
+    canonical_name: str,
+    domain: str | None,
+    existing_topics: list[str],
+) -> list[dict]:
+    result = await _topic_connections_graph.ainvoke({
+        "canonical_name": canonical_name,
+        "domain": domain or "",
+        "existing_topics": existing_topics,
+    })
+    return result.get("topic_connections", [])
