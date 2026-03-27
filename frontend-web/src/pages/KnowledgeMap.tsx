@@ -76,7 +76,7 @@ export default function KnowledgeMap() {
 
     const cRect = container.getBoundingClientRect()
 
-    const computed: LineCoord[] = edges.flatMap((edge) => {
+    const computed: LineCoord[] = edges.flatMap((edge): LineCoord[] => {
       const srcEl = nodeRefs.current[edge.source_id]
       const tgtEl = nodeRefs.current[edge.target_id]
       if (!srcEl || !tgtEl) return []
