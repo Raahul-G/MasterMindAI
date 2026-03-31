@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     NOTION_CLIENT_ID: str = ""
     NOTION_CLIENT_SECRET: str = ""
     NOTION_REDIRECT_URI: str = ""
+    SENTRY_DSN: str = ""
     ENVIRONMENT: str = "development"
     FRONTEND_URL: str = "http://localhost:5173"
 
