@@ -32,8 +32,6 @@ class LearningState(TypedDict, total=False):
     remediations: list[dict]
     prerequisite_concepts: list[str]
     covered_concepts: list[str]
-    learned_concepts: list[str]
-    recommended_concepts: list[dict]
 
 
 # ---------------------------------------------------------------------------
@@ -232,46 +230,6 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
     return {"remediations": json.loads(response.content.strip())}
 
 
-async def _recommendation_node(state: LearningState) -> dict:
-    topic = state["topic"]
-    level = state["level"]
-    learned_concepts = state.get("learned_concepts") or []
-    user_interests = state.get("user_interests") or []
-
-    learned_list = ", ".join(learned_concepts)
-    interests_str = ", ".join(user_interests) if user_interests else "general learning"
-
-    prompt = f"""You are a learning path advisor helping a student decide what to study next.
-
-The student just mastered these concepts within the topic "{topic}" at {level} level:
-{learned_list}
-
-Their personal interests are: {interests_str}
-
-Your task: suggest exactly 2 next concepts within "{topic}" that:
-1. Have the above learned concepts as direct prerequisites (they naturally build on them)
-2. Are the logical next step in understanding "{topic}"
-3. Are distinct from what was already learned
-
-Return your response as valid JSON only, with this exact structure:
-[
-  {{
-    "title": "Next Concept Name",
-    "reason": "One sentence explaining why this is the next step and how it builds on what was learned."
-  }},
-  {{
-    "title": "Second Next Concept Name",
-    "reason": "One sentence explaining why this is the next step."
-  }}
-]
-
-Return ONLY the JSON array. No explanation, no markdown code blocks, no extra text."""
-
-    llm = get_llm(temperature=0.6, max_tokens=300)
-    response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return {"recommended_concepts": json.loads(response.content.strip())}
-
-
 # ---------------------------------------------------------------------------
 # Compiled graphs (built once at import time)
 # ---------------------------------------------------------------------------
@@ -308,19 +266,10 @@ def _build_remediation_graph():
     return g.compile()
 
 
-def _build_recommendation_graph():
-    g = StateGraph(LearningState)
-    g.add_node("recommendation", _recommendation_node)
-    g.add_edge(START, "recommendation")
-    g.add_edge("recommendation", END)
-    return g.compile()
-
-
 _eli5_graph = _build_eli5_graph()
 _passages_graph = _build_passages_graph()
 _quiz_graph = _build_quiz_graph()
 _remediation_graph = _build_remediation_graph()
-_recommendation_graph = _build_recommendation_graph()
 
 
 # ---------------------------------------------------------------------------
@@ -374,19 +323,5 @@ async def generate_remediation(
     })
     return result["remediations"]
 
-
-async def generate_concept_recommendations(
-    topic: str,
-    level: str,
-    learned_concepts: list[str],
-    user_interests: list[str],
-) -> list[dict]:
-    result = await _recommendation_graph.ainvoke({
-        "topic": topic,
-        "level": level,
-        "learned_concepts": learned_concepts,
-        "user_interests": user_interests,
-    })
-    return result["recommended_concepts"]
 
 

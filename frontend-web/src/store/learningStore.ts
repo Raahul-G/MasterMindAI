@@ -3,8 +3,6 @@ import type { Passage, Question, StartModuleResponse } from '../types'
 
 interface LearningState {
   moduleId: string | null
-  topic: string | null
-  level: string | null
   eli5Text: string | null
   currentPassage: Passage | null
   quizId: string | null
@@ -18,8 +16,6 @@ interface LearningState {
 
 export const useLearningStore = create<LearningState>((set) => ({
   moduleId: null,
-  topic: null,
-  level: null,
   eli5Text: null,
   currentPassage: null,
   quizId: null,
@@ -44,8 +40,6 @@ export const useLearningStore = create<LearningState>((set) => ({
   reset: () =>
     set({
       moduleId: null,
-      topic: null,
-      level: null,
       eli5Text: null,
       currentPassage: null,
       quizId: null,

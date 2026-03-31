@@ -82,19 +82,6 @@ export interface Module {
   created_at: string
 }
 
-export interface ModuleDetail {
-  id: string
-  topic: string
-  level: string
-  eli5_text: string
-  status: string
-  markdown_url: string | null
-  notion_page_id: string | null
-  concepts_learned: number
-  completed_at: string | null
-  created_at: string
-  passages: Passage[]
-}
 
 export interface Achievement {
   slug: string

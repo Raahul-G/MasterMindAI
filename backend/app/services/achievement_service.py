@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.gamification import Achievement, UserAchievement
-from app.models.learning import Module
+from app.models.learning import Module, Passage
 from app.services import feed_service
 
 
@@ -43,10 +43,13 @@ async def check_and_award_achievements(
     Returns a list of newly earned achievement slugs (empty list if none).
     Called automatically after a module is completed.
     """
+    # Count distinct modules where the user has at least one completed concept
     count_result = await db.execute(
-        select(func.count()).select_from(Module).where(
-            Module.user_id == user_id,
-            Module.status == "completed",
+        select(func.count(func.distinct(Passage.module_id))).where(
+            Passage.module_id.in_(
+                select(Module.id).where(Module.user_id == user_id)
+            ),
+            Passage.status == "completed",
         )
     )
     completed_count = count_result.scalar() or 0
