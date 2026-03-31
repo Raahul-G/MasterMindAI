@@ -41,9 +41,9 @@ class LearningState(TypedDict, total=False):
 # ---------------------------------------------------------------------------
 
 async def _eli5_node(state: LearningState) -> dict:
-    topic = state["topic"]
-    level = state["level"]
-    interests_str = ", ".join(state["user_interests"])
+    topic = state.get("topic", "")
+    level = state.get("level", "")
+    interests_str = ", ".join(state.get("user_interests") or [])
 
     prompt = f"""You are an enthusiastic teacher who makes complex ideas feel instantly simple and exciting.
 
@@ -68,9 +68,9 @@ Return only the Big Idea explanation. No headings, no bullet points, no extra te
 
 
 async def _passages_node(state: LearningState) -> dict:
-    topic = state["topic"]
-    level = state["level"]
-    eli5_text = state["eli5_text"]
+    topic = state.get("topic", "")
+    level = state.get("level", "")
+    eli5_text = state.get("eli5_text", "")
     prerequisite_concepts = state.get("prerequisite_concepts") or []
     covered_concepts = state.get("covered_concepts") or []
 
@@ -132,13 +132,14 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
 
 
 async def _quiz_node(state: LearningState) -> dict:
-    topic = state["topic"]
-    level = state["level"]
+    topic = state.get("topic", "")
+    level = state.get("level", "")
+    passages = state.get("passages") or []
     passages_text = "\n\n".join([
-        f"CONCEPT: {p['concept_title']}\nSUMMARY: {p.get('summary', '')}\nEXPLANATION: {p.get('content', p.get('content', ''))}\nUSE CASES: {p.get('use_cases', '')}"
-        for p in state["passages"]
+        f"CONCEPT: {p['concept_title']}\nSUMMARY: {p.get('summary', '')}\nEXPLANATION: {p.get('content', '')}\nUSE CASES: {p.get('use_cases', '')}"
+        for p in passages
     ])
-    concept_list = ", ".join([f'"{p["concept_title"]}"' for p in state["passages"]])
+    concept_list = ", ".join([f'"{p["concept_title"]}"' for p in passages])
 
     prompt = f"""You are an expert quiz writer for a learning app.
 
@@ -186,9 +187,9 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
 
 
 async def _remediation_node(state: LearningState) -> dict:
-    topic = state["topic"]
-    failed_concepts = state["failed_concepts"]
-    passages = state["passages"]
+    topic = state.get("topic", "")
+    failed_concepts = state.get("failed_concepts") or []
+    passages = state.get("passages") or []
 
     original_text = "\n\n".join([
         f"CONCEPT: {p['concept_title']}\nORIGINAL EXPLANATION: {p['content']}"
