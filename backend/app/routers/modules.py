@@ -1,7 +1,7 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -27,12 +27,37 @@ async def list_modules(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
+    modules_result = await db.execute(
         select(Module)
         .where(Module.user_id == current_user.id)
         .order_by(Module.created_at.desc())
     )
-    return result.scalars().all()
+    modules = modules_result.scalars().all()
+
+    # Count completed passages per module in a single query
+    if modules:
+        module_ids = [m.id for m in modules]
+        counts_result = await db.execute(
+            select(Passage.module_id, func.count().label("cnt"))
+            .where(Passage.module_id.in_(module_ids), Passage.status == "completed")
+            .group_by(Passage.module_id)
+        )
+        counts = {row.module_id: row.cnt for row in counts_result}
+    else:
+        counts = {}
+
+    return [
+        ModuleListItem(
+            id=m.id,
+            topic=m.topic,
+            level=m.level,
+            status=m.status,
+            concepts_learned=counts.get(m.id, 0),
+            completed_at=m.completed_at,
+            created_at=m.created_at,
+        )
+        for m in modules
+    ]
 
 
 @router.get("/{module_id}", response_model=ModuleDetail)
@@ -53,6 +78,12 @@ async def get_module(
     )
     passages = passage_result.scalars().all()
 
+    concepts_learned_result = await db.execute(
+        select(func.count()).select_from(Passage)
+        .where(Passage.module_id == module_id, Passage.status == "completed")
+    )
+    concepts_learned = concepts_learned_result.scalar() or 0
+
     return ModuleDetail(
         id=module.id,
         topic=module.topic,
@@ -61,6 +92,7 @@ async def get_module(
         status=module.status,
         markdown_url=module.markdown_url,
         notion_page_id=module.notion_page_id,
+        concepts_learned=concepts_learned,
         completed_at=module.completed_at,
         created_at=module.created_at,
         passages=[PassageResponse.model_validate(p) for p in passages],

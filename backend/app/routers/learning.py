@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,6 +9,8 @@ from app.models.user import User
 from app.schemas.learning import (
     GenerateQuizRequest,
     GenerateQuizResponse,
+    NextPairRequest,
+    NextPairResponse,
     RemediateRequest,
     RemediateResponse,
     StartModuleRequest,
@@ -32,14 +36,13 @@ async def start_module(
     )
 
 
-
 @router.post("/quiz/generate", response_model=GenerateQuizResponse)
 async def generate_quiz(
     data: GenerateQuizRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await learning_service.generate_quiz_for_module(data.module_id, db)
+    return await learning_service.generate_quiz_for_passage(data.passage_id, db)
 
 
 @router.post("/quiz/submit", response_model=SubmitQuizResponse)
@@ -50,6 +53,24 @@ async def submit_quiz(
 ):
     result = await quiz_service.score_quiz(data.quiz_id, data.answers, db, data.local_date)
     return SubmitQuizResponse(**result)
+
+
+@router.post("/passage/next", response_model=NextPairResponse)
+async def next_passage_pair(
+    data: NextPairRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await learning_service.generate_next_pair(data.module_id, data.covered_concepts, db)
+
+
+@router.get("/resume/{module_id}", response_model=StartModuleResponse)
+async def resume_module(
+    module_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    return await learning_service.resume_module(module_id, db)
 
 
 @router.post("/remediate", response_model=RemediateResponse)

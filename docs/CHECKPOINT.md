@@ -5,6 +5,83 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 30 Mar 2026 at 01:30
+> Trigger: milestone — one-concept-at-a-time learning flow with inline MCQ fully implemented
+
+### 🎯 What Was Planned
+Refactor the entire learning flow from a passages-list → separate quiz page model to a per-concept inline model: one passage shown at a time, 2 MCQs inline below it, remediation inline on fail, passages generated in pairs with a "Continue" tap between pairs. Modules never complete — they accumulate concept completions.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/alembic/versions/a2d5f8c91e30_add_passage_status_and_quiz_passage_id.py` | Created | Migration adding `passages.status` (in_progress/completed) and `quizzes.passage_id` FK |
+| `backend/app/models/learning.py` | Modified | Added `status` to `Passage`; added `passage_id` FK + relationship to `Quiz` |
+| `backend/app/schemas/learning.py` | Modified | Full rewrite — new `StartModuleResponse`, `SubmitQuizResponse`, `NextPairRequest/Response`; added `concepts_learned` to module schemas |
+| `backend/app/services/ai_service.py` | Modified | Added `covered_concepts` to state; `_passages_node` now always generates exactly 2; prompt updated to skip already-covered concepts |
+| `backend/app/services/learning_service.py` | Modified | `start_module` now returns first passage + its quiz; added `generate_quiz_for_passage`, `generate_next_pair`, `resume_module` |
+| `backend/app/services/quiz_service.py` | Modified | `score_quiz` now marks passage completed, fires streak per concept, auto-creates next passage quiz or sets `needs_new_pair` |
+| `backend/app/routers/learning.py` | Modified | Updated `quiz/generate` to take `passage_id`; added `POST /learn/passage/next` and `GET /learn/resume/{module_id}` |
+| `backend/app/routers/modules.py` | Modified | `list_modules` and `get_module` now return `concepts_learned` count via subquery |
+| `frontend-web/src/types/index.ts` | Modified | Updated `Passage` (added `status`), `Module` (added `concepts_learned`), `StartModuleResponse`, `SubmitQuizResponse`; added `NextPairResponse`, `GenerateQuizResponse` |
+| `frontend-web/src/store/learningStore.ts` | Modified | Replaced `setModule/setQuiz/setQuizResult/setRemediations` with `setStart`, `setPassage`, `setConceptsLearned`; `currentPassage` replaces `passages[]` |
+| `frontend-web/src/api/learning.ts` | Modified | Updated signatures for new API; added `resumeModule`, `nextPair`; `generateQuiz` now takes `passage_id` |
+| `frontend-web/src/pages/Learning.tsx` | Modified | Complete redesign — inline state machine with phases: reading → quizzing → submitting → passed/failed/needs_pair → remediating → retry |
+| `frontend-web/src/pages/Dashboard.tsx` | Modified | Shows "X concepts learned" per module; "Continue" calls `resumeModule`; "Review" always available |
+| `frontend-web/src/pages/TopicSelection.tsx` | Modified | Changed `setModule(...)` call to `setStart(data)` |
+| `frontend-web/src/pages/Quiz.tsx` | Modified | Retired — redirects to `/dashboard` |
+| `frontend-web/src/pages/QuizResults.tsx` | Modified | Retired — redirects to `/dashboard` |
+| `frontend-web/src/pages/Remediation.tsx` | Modified | Retired — redirects to `/dashboard` |
+| `frontend-web/src/pages/ModuleComplete.tsx` | Modified | Retired — redirects to `/dashboard` |
+| `frontend-web/src/App.tsx` | Modified | Removed retired page imports; old routes now use `<Navigate to="/dashboard" replace />` |
+
+#### Code Summary
+
+**`_create_quiz_for_passage()` — `learning_service.py`**
+What it does: Takes a single passage + module, calls `ai_service.generate_quiz` with just that one concept, creates a `Quiz` row scoped to the passage, inserts `Question` rows, and returns both.
+Why this way: Extracted as a shared helper used by `start_module`, `generate_quiz_for_passage`, `generate_next_pair`, and `resume_module` to avoid duplicated quiz-creation logic.
+
+**`start_module()` — `learning_service.py`**
+What it does: Generates ELI5 + exactly 2 passages (pair 1), saves them, creates a quiz only for passage 1, and returns `current_passage + quiz_id + questions + concepts_learned=0`.
+Why this way: Passage 2 is pre-saved in DB so `score_quiz` can auto-advance to it without a second AI call.
+
+**`resume_module()` — `learning_service.py`**
+What it does: Finds the first `in_progress` passage for a module (falls back to last passage if all completed), creates a fresh quiz for it, and returns the same shape as `start_module`.
+Why this way: Lets Dashboard resume mid-session without a separate "resume" UI — same Learning page handles both new and resumed modules.
+
+**`generate_next_pair()` — `learning_service.py`**
+What it does: Accepts `covered_concepts`, calls AI for the next 2 passages building on what's already been learned, saves them with incremented `order_index`, creates quiz for first new passage.
+Why this way: Lazy generation — pairs are only generated when the user explicitly taps "Continue learning", keeping the initial load fast.
+
+**`score_quiz()` — `quiz_service.py`**
+What it does: Scores answers, marks the passage `completed` on pass, fires streak/achievements per concept, then looks for `order_index + 1` in the same module. If found it creates that passage's quiz inline and returns it; if not found it sets `needs_new_pair: true`.
+Why this way: The next passage is already in DB (pre-generated as a pair), so auto-advancing requires no extra AI call — just a DB lookup + quiz creation.
+
+**`Learning.tsx` state machine**
+What it does: Single-page flow with `phase` state cycling through `reading → quizzing → submitting → failed/passed/needs_pair → remediating → retry_loading`. Each phase renders different UI inline — no page navigation needed.
+Why this way: Keeps all quiz + remediation state local to the Learning component, eliminating the need for global store pollution and three separate pages.
+
+### 🔄 Logic Changes
+**Module completion**: Previously, passing the full module quiz marked `module.status = 'completed'` and triggered all side-effects. Now modules never complete — streak and achievements fire on each passage (concept) completion instead. The `module.status` field is kept but no longer set to `'completed'` automatically.
+
+**Quiz scope**: Previously one quiz covered all passages in a module. Now each quiz is scoped to a single passage via `quizzes.passage_id`, enabling per-concept retry without regenerating questions for concepts already passed.
+
+**Passage generation**: Previously generated 2–3 passages at module start, all returned to the frontend at once. Now always generates exactly 2, stores both in DB, returns only the first to the frontend. Subsequent pairs are generated lazily on user tap.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| Circular import risk between `quiz_service` and `learning_service` | `score_quiz` needed to create a quiz for the next passage, which lives in `learning_service` | Inlined the quiz-creation logic directly in `quiz_service` via a `_create_quiz_inline` helper that imports `ai_service` directly |
+| `ModuleListItem` Pydantic model missing `concepts_learned` | New field added to schema but not returned by raw SQLAlchemy `.all()` call | Rewrote `list_modules` to build `ModuleListItem` objects manually with a batch subquery for counts |
+
+### 📋 Planned vs Built
+Matched the agreed plan. One addition not in the original plan: `GET /learn/resume/{module_id}` endpoint — needed to support the Dashboard "Continue" button which had to load a passage + quiz without knowing which passage was current.
+
+---
+
+---
+
 ## Devlog — 24 Mar 2026 at 22:10
 > Trigger: manual /devlog — streak timezone fix + favicon added
 

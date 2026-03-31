@@ -7,10 +7,63 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
 from app.models.user import User
-from app.schemas.learning import AnswerSubmission
-from app.services import achievement_service, feed_service, notion_service, streak_service
+from app.schemas.learning import AnswerSubmission, PassageResponse, QuestionResponse
+from app.services import achievement_service, ai_service, feed_service, notion_service, streak_service
 
 logger = logging.getLogger(__name__)
+
+
+async def _count_concepts_learned(module_id: uuid.UUID, db: AsyncSession) -> int:
+    result = await db.execute(
+        select(func.count()).select_from(Passage)
+        .where(Passage.module_id == module_id, Passage.status == "completed")
+    )
+    return result.scalar() or 0
+
+
+async def _create_quiz_inline(
+    passage: Passage,
+    module: Module,
+    db: AsyncSession,
+) -> tuple[Quiz, list[Question]]:
+    """Creates a quiz for the given passage inline (no external service import needed)."""
+    passages_content = [{
+        "concept_title": passage.concept_title,
+        "summary": passage.summary,
+        "content": passage.content,
+        "use_cases": passage.use_cases,
+    }]
+    raw_questions = await ai_service.generate_quiz(module.topic, passages_content, module.level)
+
+    existing_result = await db.execute(
+        select(func.count()).select_from(Quiz).where(Quiz.passage_id == passage.id)
+    )
+    attempt_number = (existing_result.scalar() or 0) + 1
+
+    quiz = Quiz(module_id=module.id, passage_id=passage.id, attempt_number=attempt_number)
+    db.add(quiz)
+    await db.flush()
+
+    questions = []
+    for i, q in enumerate(raw_questions):
+        question = Question(
+            quiz_id=quiz.id,
+            passage_id=passage.id,
+            question_text=q["question_text"],
+            question_type=q["question_type"],
+            options=q["options"],
+            correct_answer=q["correct_answer"],
+            order_index=i + 1,
+        )
+        db.add(question)
+        questions.append(question)
+
+    await db.commit()
+    for q in questions:
+        await db.refresh(q)
+    await db.refresh(quiz)
+
+    return quiz, questions
 
 
 async def score_quiz(
@@ -20,30 +73,27 @@ async def score_quiz(
     local_date: date | None = None,
 ) -> dict:
     """
-    Scores a quiz by comparing user answers to correct answers.
-    Saves all answers to the database.
-    If the quiz is fully passed, marks the module completed and triggers
-    streak + achievement updates automatically.
-    Returns score, total, passed flag, and list of failed concept titles.
+    Scores a per-passage quiz.
+    On pass: marks the passage completed, fires streak/achievements,
+    and returns the next passage (if within the same pair) or needs_new_pair=True.
+    On fail: returns failed concepts for remediation.
     """
     result = await db.execute(select(Question).where(Question.quiz_id == quiz_id))
     questions = result.scalars().all()
     questions_by_id = {q.id: q for q in questions}
 
     correct_count = 0
-    failed_passage_ids = set()
+    failed_passage_ids: set[uuid.UUID] = set()
 
     for submission in answer_submissions:
         question = questions_by_id.get(submission.question_id)
         if not question:
             continue
-
         is_correct = submission.user_answer.strip() == question.correct_answer.strip()
         if is_correct:
             correct_count += 1
         else:
             failed_passage_ids.add(question.passage_id)
-
         db.add(Answer(
             quiz_id=quiz_id,
             question_id=submission.question_id,
@@ -54,16 +104,6 @@ async def score_quiz(
     total = len(answer_submissions)
     passed = correct_count == total
 
-    # Variables saved before commit — SQLAlchemy expires objects after db.commit()
-    completing_user_id = None
-    completing_module_id = None
-    completing_topic = None
-    completing_level = None
-    completing_score = correct_count
-    completing_total = total
-    completing_concept_titles: list[str] = []
-    is_first_attempt_perfect = False
-
     quiz_result = await db.execute(select(Quiz).where(Quiz.id == quiz_id))
     quiz = quiz_result.scalar_one_or_none()
     if quiz:
@@ -72,100 +112,127 @@ async def score_quiz(
         quiz.passed = passed
         quiz.submitted_at = datetime.now(timezone.utc)
 
-        if passed:
-            module_result = await db.execute(
-                select(Module).where(Module.id == quiz.module_id)
-            )
-            module = module_result.scalar_one_or_none()
-            if module and module.status != "completed":
-                module.status = "completed"
-                module.completed_at = datetime.now(timezone.utc)
-                completing_user_id = module.user_id
-                completing_module_id = module.id
-                completing_topic = module.topic
-                completing_level = module.level
-                is_first_attempt_perfect = quiz.attempt_number == 1
-
-                # Fetch concept titles before commit (objects expire after commit)
-                passage_result = await db.execute(
-                    select(Passage).where(Passage.module_id == module.id).order_by(Passage.order_index)
-                )
-                completing_concept_titles = [p.concept_title for p in passage_result.scalars().all()]
-
     await db.commit()
 
-    # Trigger streak + achievement + Notion updates for a newly completed module
-    notion_page_url: str | None = None
+    if not passed:
+        failed_concepts = []
+        if failed_passage_ids:
+            passage_result = await db.execute(
+                select(Passage).where(Passage.id.in_(failed_passage_ids))
+            )
+            failed_concepts = [p.concept_title for p in passage_result.scalars().all()]
 
-    if completing_user_id:
-        streak = await streak_service.update_streak(completing_user_id, db, local_date)
+        concepts_learned = await _count_concepts_learned(quiz.module_id, db) if quiz else 0
+        return {
+            "score": correct_count,
+            "total": total,
+            "passed": False,
+            "failed_concepts": failed_concepts,
+            "next_passage": None,
+            "next_quiz_id": None,
+            "next_questions": [],
+            "needs_new_pair": False,
+            "concepts_learned": concepts_learned,
+        }
 
-        remediation_result = await db.execute(
-            select(func.count()).select_from(Remediation)
-            .where(Remediation.module_id == completing_module_id)
+    # --- Passed ---
+    # 1. Mark the passage completed
+    current_passage: Passage | None = None
+    module: Module | None = None
+    is_first_attempt_perfect = False
+
+    if quiz and quiz.passage_id:
+        passage_result = await db.execute(select(Passage).where(Passage.id == quiz.passage_id))
+        current_passage = passage_result.scalar_one_or_none()
+        if current_passage:
+            current_passage.status = "completed"
+
+        module_result = await db.execute(select(Module).where(Module.id == quiz.module_id))
+        module = module_result.scalar_one_or_none()
+
+        is_first_attempt_perfect = quiz.attempt_number == 1
+        await db.commit()
+
+    concepts_learned = await _count_concepts_learned(quiz.module_id, db) if quiz else 0
+
+    # 2. Fire streak + achievements on concept completion
+    if quiz and module:
+        try:
+            streak = await streak_service.update_streak(module.user_id, db, local_date)
+
+            remediation_result = await db.execute(
+                select(func.count()).select_from(Remediation)
+                .where(
+                    Remediation.module_id == quiz.module_id,
+                    Remediation.quiz_id == quiz_id,
+                )
+            )
+            used_remediation = (remediation_result.scalar() or 0) > 0
+
+            await achievement_service.check_and_award_achievements(
+                user_id=module.user_id,
+                db=db,
+                streak_count=streak.current_streak,
+                used_remediation=used_remediation,
+                first_attempt_perfect=is_first_attempt_perfect,
+            )
+
+            await feed_service.post_activity(
+                user_id=module.user_id,
+                activity_type="module_completed",
+                metadata={
+                    "topic": module.topic,
+                    "level": module.level,
+                    "concept": current_passage.concept_title if current_passage else "",
+                },
+                db=db,
+            )
+        except Exception as exc:
+            logger.warning("Post-completion side-effects failed for quiz %s: %s", quiz_id, exc)
+
+    # 3. Look for next passage in same module (order_index + 1)
+    next_passage: Passage | None = None
+    next_quiz: Quiz | None = None
+    next_questions: list[Question] = []
+    needs_new_pair = False
+
+    if current_passage and module:
+        next_result = await db.execute(
+            select(Passage).where(
+                Passage.module_id == current_passage.module_id,
+                Passage.order_index == current_passage.order_index + 1,
+            )
         )
-        used_remediation = (remediation_result.scalar() or 0) > 0
+        next_passage = next_result.scalar_one_or_none()
 
-        await achievement_service.check_and_award_achievements(
-            user_id=completing_user_id,
-            db=db,
-            streak_count=streak.current_streak,
-            used_remediation=used_remediation,
-            first_attempt_perfect=is_first_attempt_perfect,
-        )
-
-        await feed_service.post_activity(
-            user_id=completing_user_id,
-            activity_type="module_completed",
-            metadata={
-                "topic": completing_topic,
-                "level": completing_level,
-                "score": completing_score,
-                "total": completing_total,
-            },
-            db=db,
-        )
-
-        # Auto-create Notion sub-page if the user has Notion connected
-        user_result = await db.execute(select(User).where(User.id == completing_user_id))
-        user = user_result.scalar_one_or_none()
-        if (
-            user
-            and user.notion_access_token
-            and user.notion_mastermind_page_id
-            and completing_module_id
-        ):
+        if next_passage:
+            # Next passage already in DB (within same pair) — auto-create its quiz
             try:
-                notion_page_url = await notion_service.create_module_subpage(
-                    access_token=user.notion_access_token,
-                    mastermind_page_id=user.notion_mastermind_page_id,
-                    module_id=completing_module_id,
-                    db=db,
-                )
-                # Save the Notion page URL back to the module
-                module_update = await db.execute(
-                    select(Module).where(Module.id == completing_module_id)
-                )
-                completed_module = module_update.scalar_one_or_none()
-                if completed_module:
-                    completed_module.notion_page_id = notion_page_url.split("/")[-1]
-                    await db.commit()
+                next_quiz, next_questions = await _create_quiz_inline(next_passage, module, db)
             except Exception as exc:
-                logger.warning("Notion auto-export failed for module %s: %s", completing_module_id, exc)
-
-    # Fetch failed concept titles from the passages
-    failed_concepts = []
-    if failed_passage_ids:
-        passage_result = await db.execute(
-            select(Passage).where(Passage.id.in_(failed_passage_ids))
-        )
-        failed_passages = passage_result.scalars().all()
-        failed_concepts = [p.concept_title for p in failed_passages]
+                logger.warning("Failed to create quiz for next passage %s: %s", next_passage.id, exc)
+                next_passage = None
+        else:
+            needs_new_pair = True
 
     return {
         "score": correct_count,
         "total": total,
-        "passed": passed,
-        "failed_concepts": failed_concepts,
-        "notion_page_url": notion_page_url,
+        "passed": True,
+        "failed_concepts": [],
+        "next_passage": PassageResponse.model_validate(next_passage) if next_passage else None,
+        "next_quiz_id": next_quiz.id if next_quiz else None,
+        "next_questions": [
+            QuestionResponse(
+                id=q.id,
+                concept_title=next_passage.concept_title if next_passage else "",
+                question_text=q.question_text,
+                question_type=q.question_type,
+                options=q.options or [],
+                order_index=q.order_index,
+            )
+            for q in next_questions
+        ],
+        "needs_new_pair": needs_new_pair,
+        "concepts_learned": concepts_learned,
     }

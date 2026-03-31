@@ -6,10 +6,6 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import TopicSelection from './pages/TopicSelection'
 import Learning from './pages/Learning'
-import Quiz from './pages/Quiz'
-import QuizResults from './pages/QuizResults'
-import Remediation from './pages/Remediation'
-import ModuleComplete from './pages/ModuleComplete'
 import Profile from './pages/Profile'
 import Friends from './pages/Friends'
 import ModuleReview from './pages/ModuleReview'
@@ -24,10 +20,10 @@ export default function App() {
         <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/learn/start" element={<ProtectedRoute><TopicSelection /></ProtectedRoute>} />
         <Route path="/learn" element={<ProtectedRoute><Learning /></ProtectedRoute>} />
-        <Route path="/quiz" element={<ProtectedRoute><Quiz /></ProtectedRoute>} />
-        <Route path="/quiz/results" element={<ProtectedRoute><QuizResults /></ProtectedRoute>} />
-        <Route path="/remediation" element={<ProtectedRoute><Remediation /></ProtectedRoute>} />
-        <Route path="/complete" element={<ProtectedRoute><ModuleComplete /></ProtectedRoute>} />
+        <Route path="/quiz" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/quiz/results" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/remediation" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/complete" element={<Navigate to="/dashboard" replace />} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
         <Route path="/modules/:id/review" element={<ProtectedRoute><ModuleReview /></ProtectedRoute>} />

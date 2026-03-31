@@ -1,6 +1,6 @@
 # CLAUDE.md — MasterMind
 
-> Read at session start. Last updated: 2026-02-28
+> Read at session start. Last updated: 2026-03-30
 > Session start command: "Read CLAUDE.md and confirm you understand the project."
 
 ---
@@ -45,6 +45,7 @@
 | Alembic | DB migrations |
 | PostgreSQL (Supabase) | Primary database + storage |
 | Anthropic Python SDK | Claude API calls |
+| LangChain + LangGraph | AI orchestration (one graph per function) |
 | python-jose | JWT creation/verification |
 | passlib + bcrypt | Password hashing |
 | python-dotenv | Env variable loading |
@@ -87,14 +88,15 @@ MasterMindAI/
 │   ├── requirements.txt / .env / .env.example / alembic.ini
 │   ├── alembic/env.py + versions/
 │   └── app/
-│       ├── core/config.py + database.py + security.py
+│       ├── core/config.py + database.py + security.py + llm.py
 │       ├── models/user.py + learning.py + gamification.py + social.py
 │       ├── schemas/auth.py + learning.py + quiz.py + gamification.py + social.py
 │       ├── routers/auth.py + learning.py + modules.py + gamification.py + social.py + notion.py
 │       ├── services/
-│       │   ├── ai_service.py          # All 4 Claude functions: ELI5, passages, quiz, remediation
+│       │   ├── ai_service.py          # All Claude functions: ELI5, passages, quiz, remediation
 │       │   ├── auth_service.py + learning_service.py + quiz_service.py
 │       │   ├── markdown_service.py + storage_service.py + notion_service.py
+│       │   ├── social_service.py + feed_service.py
 │       │   └── streak_service.py + achievement_service.py
 │       └── dependencies.py
 │   └── tests/test_ai_service.py + test_auth.py + test_learning.py + test_quiz.py
@@ -104,11 +106,12 @@ MasterMindAI/
 │       ├── main.tsx + App.tsx
 │       ├── pages/ Landing + Login + Register + Dashboard + TopicSelection + Learning
 │       │         + Quiz + QuizResults + Remediation + ModuleComplete + Profile
-│       │         + Friends + KnowledgeMap + Settings
-│       ├── components/ Navbar + ProgressBar + QuizCard + PassageCard + AchievementBadge
-│       │              + StreakCounter + LoadingSpinner
+│       │         + Friends + ModuleReview
+│       ├── components/ Navbar + ProtectedRoute + ProgressBar + QuizCard + PassageCard
+│       │              + AchievementBadge + StreakCounter + LoadingSpinner
 │       ├── store/ authStore.ts + learningStore.ts
-│       ├── api/ axiosClient.ts + auth.ts + learning.ts + modules.ts + social.ts
+│       ├── api/ axiosClient.ts + auth.ts + learning.ts + modules.ts + gamification.ts
+│       │         + social.ts + notion.ts
 │       └── types/index.ts
 └── frontend-mobile/
     └── src/
@@ -125,7 +128,7 @@ MasterMindAI/
 ```sql
 users          id(PK) email(UQ) hashed_password full_name avatar_url google_id(UQ)
                interest_topics(TEXT[]) notion_access_token notion_workspace_id
-               is_active created_at updated_at
+               notion_mastermind_page_id is_active created_at updated_at
 
 modules        id(PK) user_id(FK) topic level eli5_text status
                markdown_url notion_page_id completed_at created_at updated_at
@@ -171,6 +174,7 @@ SECRET_KEY=your-32-char-minimum-random-secret
 JWT_ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=60
 ANTHROPIC_API_KEY=sk-ant-your-key
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
 GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=your-secret
 NOTION_CLIENT_ID=your-notion-client-id
@@ -190,6 +194,8 @@ VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
 
 ## 7. AI Prompt Templates (`backend/app/services/ai_service.py`)
 
+Architecture: LangGraph — one compiled graph per function, invoked via `ainvoke`. All nodes are async. All prompts live exclusively in `ai_service.py`.
+
 ### generate_eli5
 - temp=0.7, max_tokens=400
 - Analogy MUST use one of `user_interests` (list of 3–5 strings)
@@ -199,6 +205,7 @@ VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
 ### generate_passages
 - temp=0.5, max_tokens=1500
 - 2–3 passages, each 100–200 words, one distinct concept each
+- Supports optional `prerequisite_concepts` list — AI skips re-explaining them
 - Build from ELI5, don't repeat it. Audience varies by level:
   - kid → "curious 10–12 year old"
   - intermediate → "university undergraduate or curious adult"
@@ -217,6 +224,11 @@ VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
 - Warm, patient tone. 100–180 words each. No reference to original explanation
 - Return: `[{"concept_title": str, "content": str}]`
 
+### generate_concept_recommendations *(unused — kept for future use)*
+- temp=0.6, max_tokens=300
+- Suggests 2 next concepts within the same topic that build on learned concepts
+- Return: `[{"title": str, "reason": str}]`
+
 ---
 
 ## 8. API Endpoints
@@ -230,13 +242,14 @@ Base: `http://localhost:8000` | Protected routes: `Authorization: Bearer <jwt>`
 | POST | /auth/login | No | email, password | access_token |
 | POST | /auth/google | No | id_token | access_token |
 | GET | /auth/me | Yes | — | user profile |
+| PUT | /auth/interests | Yes | interest_topics[] | updated user |
 
 ### /learn
 | Method | Path | Auth | Body | Response |
 |---|---|---|---|---|
-| POST | /learn/start | Yes | topic, level | module_id, eli5_text, passages |
+| POST | /learn/start | Yes | topic, level, prerequisite_concepts? | module_id, eli5_text, passages |
 | POST | /learn/quiz/generate | Yes | module_id | quiz_id, questions |
-| POST | /learn/quiz/submit | Yes | quiz_id, answers[] | score, passed, failed_concepts |
+| POST | /learn/quiz/submit | Yes | quiz_id, answers[], local_date? | score, passed, failed_concepts |
 | POST | /learn/remediate | Yes | module_id, quiz_id, failed_concepts | remediations[] |
 
 ### /modules
@@ -244,12 +257,15 @@ Base: `http://localhost:8000` | Protected routes: `Authorization: Bearer <jwt>`
 |---|---|---|---|
 | GET | /modules | Yes | all user modules |
 | GET | /modules/{id} | Yes | full module detail |
+| GET | /modules/{id}/review | Yes | module with quiz Q&A |
 | POST | /modules/{id}/export/download | Yes | download_url |
 | POST | /modules/{id}/export/notion | Yes | notion_page_url |
 
 ### /gamification
-| GET /gamification/streak | Yes | current_streak, longest_streak, last_activity_date |
-| GET /gamification/achievements | Yes | earned achievements list |
+| Method | Path | Auth | Response |
+|---|---|---|---|
+| GET | /gamification/streak | Yes | current_streak, longest_streak, last_activity_date |
+| GET | /gamification/achievements | Yes | earned achievements list |
 
 ### /social
 | Method | Path | Auth | Body/Query |
@@ -262,28 +278,30 @@ Base: `http://localhost:8000` | Protected routes: `Authorization: Bearer <jwt>`
 | GET | /social/users/search | Yes | ?q=term |
 
 ### /notion
-| GET /notion/auth-url | Yes | Returns OAuth URL |
-| GET /notion/callback | No | Handles callback, saves token |
-| DELETE /notion/disconnect | Yes | Removes Notion credentials |
+| Method | Path | Auth | Notes |
+|---|---|---|---|
+| GET | /notion/auth-url | Yes | Returns OAuth URL |
+| GET | /notion/callback | No | Handles callback, saves token |
+| DELETE | /notion/disconnect | Yes | Removes Notion credentials |
 
 ---
 
 ## 9. Build Order
 
-| Stage | Title |
-|---|---|
-| 1 | Local Environment Setup |
-| 2 | Supabase Database Setup |
-| 3 | Authentication API |
-| 4 | Core AI Service |
-| 5 | Learning Module API |
-| 6 | Cloud Storage + Markdown Export |
-| 7 | Notion Integration |
-| 8 | Gamification API |
-| 9 | Social Features API |
-| 10 | Backend Polish + Railway Deploy |
-| 11 | Web Frontend |
-| 12 | Android App |
+| Stage | Title | Status |
+|---|---|---|
+| 1 | Local Environment Setup | ✅ Complete |
+| 2 | Supabase Database Setup | ✅ Complete |
+| 3 | Authentication API | ✅ Complete |
+| 4 | Core AI Service | ✅ Complete |
+| 5 | Learning Module API | ✅ Complete |
+| 6 | Cloud Storage + Markdown Export | ✅ Complete |
+| 7 | Notion Integration | ✅ Complete |
+| 8 | Gamification API | ✅ Complete |
+| 9 | Social Features API | ✅ Complete |
+| 10 | Backend Polish + Railway Deploy | ✅ Complete |
+| 11 | Web Frontend | ✅ Complete (13 pages) |
+| 12 | Android App | ⬜ Next |
 
 ---
 

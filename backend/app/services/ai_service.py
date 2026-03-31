@@ -31,6 +31,7 @@ class LearningState(TypedDict, total=False):
     quiz_questions: list[dict]
     remediations: list[dict]
     prerequisite_concepts: list[str]
+    covered_concepts: list[str]
     learned_concepts: list[str]
     recommended_concepts: list[dict]
 
@@ -44,21 +45,22 @@ async def _eli5_node(state: LearningState) -> dict:
     level = state["level"]
     interests_str = ", ".join(state["user_interests"])
 
-    prompt = f"""You are a brilliant teacher who is amazing at explaining complex things simply.
+    prompt = f"""You are an enthusiastic teacher who makes complex ideas feel instantly simple and exciting.
 
-Your task is to explain the topic "{topic}" as if you are talking to a 5-year-old child.
+Your job is to write the "Big Idea" for the topic "{topic}" — a short, memorable explanation that gives the learner an instant gut-feeling of what this topic is about.
 
-This specific learner is personally interested in: {interests_str}
+This learner personally loves: {interests_str}
 
 Rules:
-- You MUST build your analogy using one or more of the learner's personal interests listed above — do not use a generic analogy
-- Keep it to 3-5 sentences maximum
-- Do NOT use jargon or technical terms of any kind
-- Start directly with the analogy — do not say "imagine" or "think of it like" as your very first word, be more creative
-- Do not mention the difficulty level "{level}" at all
-- End with one sentence about why this topic is interesting or useful to know
+- BUILD your analogy directly around ONE of the learner's specific interests above — make it feel personal
+- Write 2–4 sentences maximum
+- No jargon, no technical words of any kind — a 10-year-old should understand every word
+- Do NOT start your first sentence with "Imagine" — be more creative and direct
+- Do not mention the difficulty level "{level}"
+- End with one punchy sentence on why this topic is useful or cool in real life
+- Friendly, energetic tone — make the learner think "oh, that actually makes sense!"
 
-Return only the ELI5 explanation. No headings, no bullet points, no extra commentary."""
+Return only the Big Idea explanation. No headings, no bullet points, no extra text."""
 
     llm = get_llm(temperature=0.7, max_tokens=400)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
@@ -70,6 +72,7 @@ async def _passages_node(state: LearningState) -> dict:
     level = state["level"]
     eli5_text = state["eli5_text"]
     prerequisite_concepts = state.get("prerequisite_concepts") or []
+    covered_concepts = state.get("covered_concepts") or []
 
     level_descriptions = {
         "kid": "a curious 10-12 year old child with no prior knowledge of this subject",
@@ -78,48 +81,52 @@ async def _passages_node(state: LearningState) -> dict:
     }
     audience = level_descriptions.get(level, level_descriptions["intermediate"])
 
-    prerequisite_line = ""
-    if prerequisite_concepts:
-        joined = ", ".join(prerequisite_concepts)
-        prerequisite_line = (
-            f"\nImportant: The learner already understands these prerequisite concepts: {joined}. "
-            "Do NOT re-explain them — assume that knowledge and build directly on top of it.\n"
+    context_line = ""
+    all_known = list(dict.fromkeys(prerequisite_concepts + covered_concepts))
+    if all_known:
+        joined = ", ".join(all_known)
+        context_line = (
+            f"\nImportant: The learner already understands these concepts: {joined}. "
+            "Do NOT re-explain them. Build on them and introduce the next 2 logical concepts.\n"
         )
 
-    prompt = f"""You are an expert educator writing clear, engaging learning content.
+    prompt = f"""You are an expert educator writing structured learning content for a learning app.
 
 Topic: {topic}
 Audience: {audience}
-{prerequisite_line}
-Context: The learner has just read this introductory analogy:
+{context_line}
+The learner has just read this Big Idea introduction:
 "{eli5_text}"
 
-Your task is to write exactly 2 or 3 core concept passages about "{topic}" for this audience.
+Write exactly 2 concept cards about "{topic}" for this audience. These should be the next 2 logical concepts to learn, distinct from any already-covered concepts listed above.
 
-Rules:
-- Each passage must cover one distinct, important concept within the topic
-- Each passage must have a clear, specific title (the concept name)
-- Each passage should be 100-200 words
-- Write at the appropriate level for the audience — not too simple, not too advanced
-- Build naturally from the ELI5 analogy above
-- Do NOT repeat the ELI5 analogy
-- Use active voice and engaging prose
+Each concept card has THREE parts:
+
+1. summary — ONE sentence using a simple, concrete analogy that captures the whole concept like a flashcard. No jargon. Think of this as the sticky sentence a learner will remember.
+
+2. content — 2 to 4 sentences that explain what the concept actually is, written simply and directly for the audience. Build on the summary. Do NOT repeat the Big Idea analogy above.
+
+3. use_cases — 2 to 3 sentences that connect the analogy to a real-world example of where and why this concept is used in practice. Make it feel tangible and useful.
 
 Return your response as valid JSON only, with this exact structure:
 [
   {{
-    "concept_title": "Title of Concept 1",
-    "content": "Full passage text for concept 1..."
+    "concept_title": "Name of Concept 1",
+    "summary": "One sentence analogy that captures the concept.",
+    "content": "2-4 sentences explaining what the concept is...",
+    "use_cases": "2-3 sentences on where and why it is used in real life..."
   }},
   {{
-    "concept_title": "Title of Concept 2",
-    "content": "Full passage text for concept 2..."
+    "concept_title": "Name of Concept 2",
+    "summary": "One sentence analogy that captures the concept.",
+    "content": "2-4 sentences explaining what the concept is...",
+    "use_cases": "2-3 sentences on where and why it is used in real life..."
   }}
 ]
 
 Return ONLY the JSON array. No explanation, no markdown code blocks, no extra text."""
 
-    llm = get_llm(temperature=0.5, max_tokens=1500)
+    llm = get_llm(temperature=0.5, max_tokens=2000)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
     return {"passages": json.loads(response.content.strip())}
 
@@ -128,41 +135,42 @@ async def _quiz_node(state: LearningState) -> dict:
     topic = state["topic"]
     level = state["level"]
     passages_text = "\n\n".join([
-        f"CONCEPT: {p['concept_title']}\n{p['content']}"
+        f"CONCEPT: {p['concept_title']}\nSUMMARY: {p.get('summary', '')}\nEXPLANATION: {p.get('content', p.get('content', ''))}\nUSE CASES: {p.get('use_cases', '')}"
         for p in state["passages"]
     ])
+    concept_list = ", ".join([f'"{p["concept_title"]}"' for p in state["passages"]])
 
-    prompt = f"""You are an expert quiz writer creating assessment questions for a learning app.
+    prompt = f"""You are an expert quiz writer for a learning app.
 
 Topic: {topic}
 Level: {level}
 
-The learner has read the following passages:
+The learner has studied these concept cards:
 
 {passages_text}
 
-Your task is to write between 5 and 10 quiz questions that test understanding of ONLY the content above.
+Concepts to cover: {concept_list}
 
-Rules:
-- Each question must be either true/false or multiple choice (your choice per question)
-- For multiple choice: provide exactly 4 options (A, B, C, D)
-- For true/false: options array should be ["True", "False"]
-- The correct_answer must exactly match one of the options strings
-- Each question must be tagged with the concept_title it tests (use the exact concept titles from above)
-- Do not ask questions about information not covered in the passages
-- Questions should test understanding, not just word-matching
+Your task: write EXACTLY 2 questions for EACH concept above.
+- Mix question types freely: true/false or multiple choice — your choice per question
+- For multiple choice: exactly 4 options
+- For true/false: options must be ["True", "False"]
+- correct_answer must exactly match one of the options strings
+- Tag each question with the exact concept_title it tests
+- Test genuine understanding — not just word recall
+- Do not ask about anything not covered in the concept cards above
 
 Return your response as valid JSON only, with this exact structure:
 [
   {{
-    "concept_title": "Title of the concept this question tests",
-    "question_text": "The question text here?",
+    "concept_title": "Exact concept title from above",
+    "question_text": "Your question here?",
     "question_type": "multiple_choice",
-    "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
-    "correct_answer": "Option A text"
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "Option A"
   }},
   {{
-    "concept_title": "Title of the concept this question tests",
+    "concept_title": "Exact concept title from above",
     "question_text": "True or false: statement here.",
     "question_type": "true_false",
     "options": ["True", "False"],
@@ -332,12 +340,14 @@ async def generate_passages(
     level: str,
     eli5_text: str,
     prerequisite_concepts: list[str] | None = None,
+    covered_concepts: list[str] | None = None,
 ) -> list[dict]:
     result = await _passages_graph.ainvoke({
         "topic": topic,
         "level": level,
         "eli5_text": eli5_text,
         "prerequisite_concepts": prerequisite_concepts or [],
+        "covered_concepts": covered_concepts or [],
     })
     return result["passages"]
 

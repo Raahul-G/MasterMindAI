@@ -13,20 +13,13 @@ class StartModuleRequest(BaseModel):
 class PassageResponse(BaseModel):
     id: uuid.UUID
     concept_title: str
+    summary: str | None = None
     content: str
+    use_cases: str | None = None
     order_index: int
+    status: str = "in_progress"
 
     model_config = {"from_attributes": True}
-
-
-class StartModuleResponse(BaseModel):
-    module_id: uuid.UUID
-    eli5_text: str
-    passages: list[PassageResponse]
-
-
-class GenerateQuizRequest(BaseModel):
-    module_id: uuid.UUID
 
 
 class QuestionResponse(BaseModel):
@@ -38,6 +31,19 @@ class QuestionResponse(BaseModel):
     order_index: int
 
     model_config = {"from_attributes": True}
+
+
+class StartModuleResponse(BaseModel):
+    module_id: uuid.UUID
+    eli5_text: str
+    current_passage: PassageResponse
+    quiz_id: uuid.UUID
+    questions: list[QuestionResponse]
+    concepts_learned: int = 0
+
+
+class GenerateQuizRequest(BaseModel):
+    passage_id: uuid.UUID
 
 
 class GenerateQuizResponse(BaseModel):
@@ -61,7 +67,23 @@ class SubmitQuizResponse(BaseModel):
     total: int
     passed: bool
     failed_concepts: list[str]
-    notion_page_url: str | None = None
+    next_passage: PassageResponse | None = None
+    next_quiz_id: uuid.UUID | None = None
+    next_questions: list[QuestionResponse] = []
+    needs_new_pair: bool = False
+    concepts_learned: int = 0
+
+
+class NextPairRequest(BaseModel):
+    module_id: uuid.UUID
+    covered_concepts: list[str] = []
+
+
+class NextPairResponse(BaseModel):
+    current_passage: PassageResponse
+    quiz_id: uuid.UUID
+    questions: list[QuestionResponse]
+    concepts_learned: int
 
 
 class RemediateRequest(BaseModel):
@@ -84,6 +106,7 @@ class ModuleListItem(BaseModel):
     topic: str
     level: str
     status: str
+    concepts_learned: int = 0
     completed_at: datetime | None
     created_at: datetime
 
@@ -98,6 +121,7 @@ class ModuleDetail(BaseModel):
     status: str
     markdown_url: str | None
     notion_page_id: str | None
+    concepts_learned: int = 0
     completed_at: datetime | None
     created_at: datetime
     passages: list[PassageResponse]
@@ -134,5 +158,3 @@ class ModuleReviewResponse(BaseModel):
     quiz_total: int | None
     quiz_attempts: int | None
     questions: list[ReviewQuestionResponse]
-
-

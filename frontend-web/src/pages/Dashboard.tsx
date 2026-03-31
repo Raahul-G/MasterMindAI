@@ -3,15 +3,16 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import StreakCounter from '../components/StreakCounter'
 import LoadingSpinner from '../components/LoadingSpinner'
-import { getModules, getModule } from '../api/modules'
+import { getModules } from '../api/modules'
+import { resumeModule } from '../api/learning'
 import { getStreak } from '../api/gamification'
 import { getMe } from '../api/auth'
 import { useAuthStore } from '../store/authStore'
 import { useLearningStore } from '../store/learningStore'
 import type { Module, Streak } from '../types'
 
-const LEVEL_LABELS = { kid: 'Kid', intermediate: 'Intermediate', expert: 'Expert' }
-const LEVEL_COLORS = {
+const LEVEL_LABELS: Record<string, string> = { kid: 'Kid', intermediate: 'Intermediate', expert: 'Expert' }
+const LEVEL_COLORS: Record<string, string> = {
   kid: 'bg-green-100 text-forest-900',
   intermediate: 'bg-green-600 text-white',
   expert: 'bg-purple-100 text-purple-600',
@@ -22,13 +23,13 @@ export default function Dashboard() {
   const [streak, setStreak] = useState<Streak | null>(null)
   const [loading, setLoading] = useState(true)
   const { user, setAuth, token } = useAuthStore()
-  const setModule = useLearningStore((s) => s.setModule)
+  const setStart = useLearningStore((s) => s.setStart)
   const navigate = useNavigate()
 
   const handleContinue = async (mod: Module) => {
     try {
-      const { data } = await getModule(mod.id)
-      setModule(data.id.toString(), data.topic, data.level, data.eli5_text ?? '', data.passages)
+      const { data } = await resumeModule(mod.id)
+      setStart(data)
       navigate('/learn')
     } catch {
       navigate('/learn/start')
@@ -95,10 +96,8 @@ export default function Dashboard() {
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLORS[mod.level]}`}>
                       {LEVEL_LABELS[mod.level]}
                     </span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                      mod.status === 'completed' ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
-                    }`}>
-                      {mod.status === 'completed' ? 'Completed' : 'In Progress'}
+                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                      {mod.concepts_learned} concept{mod.concepts_learned !== 1 ? 's' : ''} learned
                     </span>
                   </div>
                   <h3 className="font-semibold text-forest-900">{mod.topic}</h3>
@@ -106,16 +105,20 @@ export default function Dashboard() {
                     {new Date(mod.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <button
-                  onClick={() =>
-                    mod.status === 'completed'
-                      ? navigate(`/modules/${mod.id}/review`)
-                      : handleContinue(mod)
-                  }
-                  className="text-sm text-green-600 font-medium hover:underline"
-                >
-                  {mod.status === 'completed' ? 'Review' : 'Continue'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => navigate(`/modules/${mod.id}/review`)}
+                    className="text-sm text-gray-400 font-medium hover:underline"
+                  >
+                    Review
+                  </button>
+                  <button
+                    onClick={() => handleContinue(mod)}
+                    className="text-sm text-green-600 font-medium hover:underline"
+                  >
+                    Continue
+                  </button>
+                </div>
               </div>
             ))}
           </div>

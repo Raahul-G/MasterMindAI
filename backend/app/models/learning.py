@@ -35,8 +35,11 @@ class Passage(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     module_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
     concept_title: Mapped[str] = mapped_column(String(255), nullable=False)
+    summary: Mapped[str | None] = mapped_column(Text, nullable=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    use_cases: Mapped[str | None] = mapped_column(Text, nullable=True)
     order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(50), default="in_progress", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -50,6 +53,7 @@ class Quiz(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     module_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("modules.id", ondelete="CASCADE"), nullable=False)
+    passage_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("passages.id", ondelete="SET NULL"), nullable=True)
     attempt_number: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_questions: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -59,6 +63,7 @@ class Quiz(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     module: Mapped["Module"] = relationship("Module", back_populates="quizzes")
+    passage: Mapped["Passage | None"] = relationship("Passage", foreign_keys=[passage_id])
     questions: Mapped[list["Question"]] = relationship("Question", back_populates="quiz", cascade="all, delete-orphan")
     answers: Mapped[list["Answer"]] = relationship("Answer", back_populates="quiz", cascade="all, delete-orphan")
     remediations: Mapped[list["Remediation"]] = relationship("Remediation", back_populates="quiz")

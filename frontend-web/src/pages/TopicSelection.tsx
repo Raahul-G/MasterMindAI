@@ -19,7 +19,7 @@ export default function TopicSelection() {
   const [level, setLevel] = useState<'kid' | 'intermediate' | 'expert'>('intermediate')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const setModule = useLearningStore((s) => s.setModule)
+  const setStart = useLearningStore((s) => s.setStart)
   const navigate = useNavigate()
 
   const prerequisiteConcepts = locationState?.prerequisite_concepts ?? []
@@ -31,7 +31,7 @@ export default function TopicSelection() {
     setLoading(true)
     try {
       const { data } = await startModule(topic.trim(), level, prerequisiteConcepts.length > 0 ? prerequisiteConcepts : undefined)
-      setModule(data.module_id, topic.trim(), level, data.eli5_text, data.passages)
+      setStart(data)
       navigate('/learn')
     } catch {
       setError('Failed to start module. Please try again.')

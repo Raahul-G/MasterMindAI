@@ -12,8 +12,11 @@ export interface User {
 export interface Passage {
   id: string
   concept_title: string
+  summary: string | null
   content: string
+  use_cases: string | null
   order_index: number
+  status: string
 }
 
 export interface Question {
@@ -30,12 +33,37 @@ export interface AnswerSubmission {
   user_answer: string
 }
 
-export interface QuizResult {
+export interface StartModuleResponse {
+  module_id: string
+  eli5_text: string
+  current_passage: Passage
+  quiz_id: string
+  questions: Question[]
+  concepts_learned: number
+}
+
+export interface SubmitQuizResponse {
   score: number
   total: number
   passed: boolean
   failed_concepts: string[]
-  notion_page_url: string | null
+  next_passage: Passage | null
+  next_quiz_id: string | null
+  next_questions: Question[]
+  needs_new_pair: boolean
+  concepts_learned: number
+}
+
+export interface GenerateQuizResponse {
+  quiz_id: string
+  questions: Question[]
+}
+
+export interface NextPairResponse {
+  current_passage: Passage
+  quiz_id: string
+  questions: Question[]
+  concepts_learned: number
 }
 
 export interface Remediation {
@@ -48,24 +76,24 @@ export interface Module {
   topic: string
   level: 'kid' | 'intermediate' | 'expert'
   status: 'in_progress' | 'completed'
+  concepts_learned: number
   eli5_text: string | null
   completed_at: string | null
   created_at: string
 }
 
-export interface ModuleDetail extends Module {
-  passages: Passage[]
-}
-
-export interface StartModuleResponse {
-  module_id: string
+export interface ModuleDetail {
+  id: string
+  topic: string
+  level: string
   eli5_text: string
+  status: string
+  markdown_url: string | null
+  notion_page_id: string | null
+  concepts_learned: number
+  completed_at: string | null
+  created_at: string
   passages: Passage[]
-}
-
-export interface GenerateQuizResponse {
-  quiz_id: string
-  questions: Question[]
 }
 
 export interface Achievement {
@@ -131,4 +159,3 @@ export interface ModuleReview {
   quiz_attempts: number | null
   questions: ReviewQuestion[]
 }
-
