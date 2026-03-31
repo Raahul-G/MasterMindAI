@@ -13,7 +13,6 @@ import ModuleComplete from './pages/ModuleComplete'
 import Profile from './pages/Profile'
 import Friends from './pages/Friends'
 import ModuleReview from './pages/ModuleReview'
-import KnowledgeMap from './pages/KnowledgeMap'
 
 export default function App() {
   return (
@@ -32,7 +31,6 @@ export default function App() {
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
         <Route path="/modules/:id/review" element={<ProtectedRoute><ModuleReview /></ProtectedRoute>} />
-        <Route path="/knowledge-map" element={<ProtectedRoute><KnowledgeMap /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

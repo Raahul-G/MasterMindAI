@@ -14,7 +14,7 @@ from app.schemas.learning import (
     RemediationResponse,
     StartModuleResponse,
 )
-from app.services import ai_service, recommendation_service
+from app.services import ai_service
 
 
 async def start_module(
@@ -57,18 +57,6 @@ async def start_module(
     for p in passages:
         await db.refresh(p)
     await db.refresh(module)
-
-    # Normalise topic and create in_progress node (fire-and-forget, non-blocking)
-    try:
-        await recommendation_service.create_or_update_topic_node(
-            user_id=user.id,
-            topic=topic,
-            module_id=module.id,
-            status="in_progress",
-            db=db,
-        )
-    except Exception:
-        pass
 
     return StartModuleResponse(
         module_id=module.id,
