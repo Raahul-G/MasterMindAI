@@ -19,7 +19,8 @@ Replace the old 8 module-completion badges with a three-system achievement desig
 | `backend/app/services/achievement_service.py` | Modified | Full rewrite with 3 badge categories, dynamic mastery level creation, new per-module DB helpers |
 | `backend/app/schemas/gamification.py` | Modified | Added `total_concepts: int = 0` to `StreakResponse` |
 | `backend/app/routers/gamification.py` | Modified | `get_streak()` now queries and returns total completed passages across all user modules |
-| `backend/app/services/quiz_service.py` | Modified | `score_quiz()` computes global `total_concepts`, removes `used_remediation`/`first_attempt_perfect` params |
+| `backend/app/services/quiz_service.py` | Modified | `score_quiz()` computes global `total_concepts`, removes
+ `used_remediation`/`first_attempt_perfect` params |
 | `frontend-web/src/types/index.ts` | Modified | Added `total_concepts: number` to `Streak` interface |
 | `frontend-web/src/components/MasteryBar.tsx` | Created | Liquid-fill bar showing Seed→Forest tier with level cycling, purple text labels |
 | `frontend-web/src/components/StreakBar.tsx` | Created | Full 14-tier grid for Profile page — green section (Dew→Sun) + violet section (Moon→Aurora) |

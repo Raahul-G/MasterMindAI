@@ -19,7 +19,7 @@ function timeAgo(dateStr: string): string {
 function feedDescription(item: ActivityFeedItem): string {
   const m = item.metadata
   if (item.activity_type === 'module_completed') {
-    return `finished learning "${m.topic}" — ${m.score}/${m.total}`
+    return `finished learning "${m.concept}" under "${m.topic}"`
   }
   if (item.activity_type === 'achievement_earned') {
     return `earned the "${m.name}" badge`
