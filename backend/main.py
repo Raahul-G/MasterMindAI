@@ -7,8 +7,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.routers import auth, gamification, learning, modules, notion, social
 
 if settings.SENTRY_DSN:
@@ -38,6 +41,8 @@ _HTTP_CODE_NAMES: dict[int, str] = {
 
 app = FastAPI(title="MasterMind API", version="0.1.0")
 
+app.state.limiter = limiter
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins,
@@ -68,6 +73,14 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return JSONResponse(
         status_code=422,
         content={"error": {"code": "validation_error", "message": message}},
+    )
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"error": {"code": "rate_limited", "message": "Too many requests. Please slow down and try again shortly."}},
     )
 
 

@@ -5,7 +5,7 @@ from datetime import date, datetime, timezone
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
+from app.models.learning import Answer, Module, Passage, Question, Quiz
 from app.models.user import User
 from app.schemas.learning import AnswerSubmission, PassageResponse, QuestionResponse
 from app.services import achievement_service, ai_service, feed_service, streak_service
@@ -139,7 +139,6 @@ async def score_quiz(
     # 1. Mark the passage completed
     current_passage: Passage | None = None
     module: Module | None = None
-    is_first_attempt_perfect = False
 
     if quiz and quiz.passage_id:
         passage_result = await db.execute(select(Passage).where(Passage.id == quiz.passage_id))
@@ -150,7 +149,6 @@ async def score_quiz(
         module_result = await db.execute(select(Module).where(Module.id == quiz.module_id))
         module = module_result.scalar_one_or_none()
 
-        is_first_attempt_perfect = quiz.attempt_number == 1
         await db.commit()
 
     concepts_learned = await _count_concepts_learned(quiz.module_id, db) if quiz else 0
@@ -160,21 +158,19 @@ async def score_quiz(
         try:
             streak = await streak_service.update_streak(module.user_id, db, local_date)
 
-            remediation_result = await db.execute(
-                select(func.count()).select_from(Remediation)
-                .where(
-                    Remediation.module_id == quiz.module_id,
-                    Remediation.quiz_id == quiz_id,
-                )
+            # Total completed passages across ALL of this user's modules
+            total_concepts_result = await db.execute(
+                select(func.count(Passage.id))
+                .join(Module, Passage.module_id == Module.id)
+                .where(Module.user_id == module.user_id, Passage.status == "completed")
             )
-            used_remediation = (remediation_result.scalar() or 0) > 0
+            total_concepts = total_concepts_result.scalar() or 0
 
             await achievement_service.check_and_award_achievements(
                 user_id=module.user_id,
                 db=db,
                 streak_count=streak.current_streak,
-                used_remediation=used_remediation,
-                first_attempt_perfect=is_first_attempt_perfect,
+                total_concepts=total_concepts,
             )
 
             await feed_service.post_activity(

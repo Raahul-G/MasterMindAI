@@ -1,9 +1,10 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.learning import (
@@ -24,7 +25,9 @@ router = APIRouter(prefix="/learn", tags=["learning"])
 
 
 @router.post("/start", response_model=StartModuleResponse)
+@limiter.limit("5/minute")
 async def start_module(
+    request: Request,
     data: StartModuleRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -37,7 +40,9 @@ async def start_module(
 
 
 @router.post("/quiz/generate", response_model=GenerateQuizResponse)
+@limiter.limit("5/minute")
 async def generate_quiz(
+    request: Request,
     data: GenerateQuizRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -46,7 +51,9 @@ async def generate_quiz(
 
 
 @router.post("/quiz/submit", response_model=SubmitQuizResponse)
+@limiter.limit("5/minute")
 async def submit_quiz(
+    request: Request,
     data: SubmitQuizRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -56,7 +63,9 @@ async def submit_quiz(
 
 
 @router.post("/passage/next", response_model=NextPairResponse)
+@limiter.limit("5/minute")
 async def next_passage_pair(
+    request: Request,
     data: NextPairRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -65,7 +74,9 @@ async def next_passage_pair(
 
 
 @router.get("/resume/{module_id}", response_model=StartModuleResponse)
+@limiter.limit("5/minute")
 async def resume_module(
+    request: Request,
     module_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -74,7 +85,9 @@ async def resume_module(
 
 
 @router.post("/remediate", response_model=RemediateResponse)
+@limiter.limit("5/minute")
 async def remediate(
+    request: Request,
     data: RemediateRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),

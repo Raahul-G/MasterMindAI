@@ -5,6 +5,104 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 31 Mar 2026 at 16:45
+> Trigger: milestone — achievement system fully redesigned (Mastery Bar, Badge Locker, Progressive Streak Bar)
+
+### 🎯 What Was Planned
+Replace the old 8 module-completion badges with a three-system achievement design: an infinite-level Mastery Bar (concept milestones), a Badge Locker (5 fixed earned badges), and a 14-tier Progressive Streak Bar — all concept-completion driven, not module-completion driven.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/alembic/versions/bef81a6a496f_reseed_achievements_v2.py` | Created | Data migration: deletes old 8 achievements, inserts 24 new rows (5 mastery Lv.1 + 5 badge locker + 14 streak) |
+| `backend/app/services/achievement_service.py` | Modified | Full rewrite with 3 badge categories, dynamic mastery level creation, new per-module DB helpers |
+| `backend/app/schemas/gamification.py` | Modified | Added `total_concepts: int = 0` to `StreakResponse` |
+| `backend/app/routers/gamification.py` | Modified | `get_streak()` now queries and returns total completed passages across all user modules |
+| `backend/app/services/quiz_service.py` | Modified | `score_quiz()` computes global `total_concepts`, removes `used_remediation`/`first_attempt_perfect` params |
+| `frontend-web/src/types/index.ts` | Modified | Added `total_concepts: number` to `Streak` interface |
+| `frontend-web/src/components/MasteryBar.tsx` | Created | Liquid-fill bar showing Seed→Forest tier with level cycling, purple text labels |
+| `frontend-web/src/components/StreakBar.tsx` | Created | Full 14-tier grid for Profile page — green section (Dew→Sun) + violet section (Moon→Aurora) |
+| `frontend-web/src/components/StreakCounter.tsx` | Modified | Redesigned: shows current tier name + day count, green below 30 days, purple above |
+| `frontend-web/src/components/AchievementBadge.tsx` | Modified | New style: violet outline ring on green background for earned badges |
+| `frontend-web/src/pages/Profile.tsx` | Modified | Major redesign: Mastery Bar section → Streak section → Badge Locker → Interests → Notion |
+
+#### Code Summary
+
+**`check_and_award_achievements()` — `achievement_service.py`**
+What it does: Checks 3 categories in order — mastery milestones (level-based, infinite), badge locker (5 fixed conditions), streak milestones (14 tiers). Awards each once, dynamically creates achievement rows for higher mastery levels.
+Why this way: Split into 3 clear sections so each category is independently readable and testable; dynamic row creation avoids pre-seeding infinite levels.
+
+**`_award_dynamic()` — `achievement_service.py`**
+What it does: Like `_award_if_not_earned()` but inserts the `Achievement` row first if it doesn't exist — used for mastery Lv.2+ milestones that aren't pre-seeded.
+Why this way: Pre-seeding infinite levels isn't feasible; on-demand creation is lazy and safe.
+
+**`_max_concepts_in_any_module()` + `_modules_with_any_concept()` — `achievement_service.py`**
+What it does: Two subquery helpers — max completed passages in any single module (for Deep Root/Wildwood), and count of modules with ≥1 completed passage (for Planter/Explorer).
+Why this way: Extracted as helpers to keep the main check function readable; both are only called when total_concepts qualifies.
+
+**`getMasteryState()` — `MasteryBar.tsx`**
+What it does: Computes the current level (every 100 concepts), position within level (1–100), fill percentage, and active tier (Seed/Sprout/Leaf/Tree/Forest) from a raw concept count.
+Why this way: All bar rendering state derives from one pure function — easy to test in isolation.
+
+**`TierTile` + `StreakBar` — `StreakBar.tsx`**
+What it does: Renders 14 streak milestones as colored tiles in a 4-column grid, split into green (days 3–21) and violet (days 30–365) sections. Earned state driven by both `earnedSlugs` and live `currentStreak`.
+Why this way: Two-section layout visually communicates the green→violet transition described in the design spec.
+
+### 🔄 Logic Changes
+**Old:** Achievements fired when a module was fully completed (`module.status = 'completed'`). 8 fixed slugs: first_steps, knowledge_seeker, scholar, clean_sweep, comeback_kid, streak_starter, hot_streak, dedicated.
+**New:** Achievements fire on every concept completion (passage pass). 3 categories: mastery bar (level cycles every 100), badge locker (per-module and cross-module concept counts), streak milestones (14 tiers). `score_quiz()` no longer tracks `used_remediation` or `first_attempt_perfect`.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| None | — | — |
+
+### 📋 Planned vs Built
+Matched plan. All user choices (DB records for milestones, Replace entirely, Lv.N loop, Profile + Dashboard streak widget) implemented as specified. One clarification resolved during planning: "Planter" requires 3 modules with ≥1 concept completed (not just 3 modules created); implemented accordingly.
+
+---
+
+## Devlog — 31 Mar 2026 at 14:10
+> Trigger: milestone — slowapi per-user rate limiting added to all /learn/* endpoints
+
+### 🎯 What Was Planned
+Add `slowapi` rate limiting to all six `/learn/*` endpoints at 5 requests/minute per authenticated user, to prevent LLM cost abuse without blocking normal usage.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `backend/app/core/limiter.py` | Created | Shared `Limiter` instance with a JWT-aware key function |
+| `backend/main.py` | Modified | Registers `SlowAPIMiddleware` and a custom 429 exception handler |
+| `backend/app/routers/learning.py` | Modified | `@limiter.limit("5/minute")` + `request: Request` added to all 6 endpoints |
+| `backend/requirements.txt` | Modified | Added `slowapi==0.1.9` and its 3 transitive dependencies |
+
+#### Code Summary
+
+**`_get_user_key()` — `backend/app/core/limiter.py`**
+What it does: Extracts the user ID from the `Authorization: Bearer` header by decoding the JWT. Falls back to the client IP if the token is absent or invalid.
+Why this way: Per-user limits are more precise than IP limits — multiple users on the same network share an IP but should each get their own 5/min bucket.
+
+**`rate_limit_handler()` — `backend/main.py`**
+What it does: Catches `RateLimitExceeded` and returns a 429 `{"error": {"code": "rate_limited", "message": "..."}}` matching the project's standard error shape.
+Why this way: Without a specific handler, `RateLimitExceeded` would fall through to the catch-all `Exception` handler and log a spurious 500 error.
+
+### 🔄 Logic Changes
+No existing logic changed. New middleware and exception handler added. The `SlowAPIMiddleware` is registered before `CORSMiddleware` in the stack so rate limiting fires before CORS headers are set.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| None | — | — |
+
+### 📋 Planned vs Built
+Matched plan. All 6 `/learn/*` endpoints rate limited at 5/minute per user. Key function degrades gracefully to IP-based limiting for unauthenticated requests (e.g. if a bad token is sent). `SYSTEM_BREAKDOWN.md` updated to mark the Sentry quick-win as done and document the new per-user rate limiting.
+
+---
+
 ## Devlog — 30 Mar 2026 at 01:30
 > Trigger: milestone — one-concept-at-a-time learning flow with inline MCQ fully implemented
 

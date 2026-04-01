@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Navbar from '../components/Navbar'
-import StreakCounter from '../components/StreakCounter'
+import MasteryBar from '../components/MasteryBar'
+import StreakBar from '../components/StreakBar'
 import AchievementBadge from '../components/AchievementBadge'
 import LoadingSpinner from '../components/LoadingSpinner'
 import { getStreak, getAchievements } from '../api/gamification'
@@ -10,15 +11,12 @@ import { getNotionAuthUrl, disconnectNotion } from '../api/notion'
 import { useAuthStore } from '../store/authStore'
 import type { Streak, Achievement } from '../types'
 
-const ALL_ACHIEVEMENTS = [
-  { slug: 'first_steps', name: 'First Steps', description: 'Complete your first module', icon_emoji: '👣' },
-  { slug: 'clean_sweep', name: 'First Try', description: 'Pass without remediation', icon_emoji: '🥇' },
-  { slug: 'comeback_kid', name: 'Comeback Kid', description: 'Pass after using remediation', icon_emoji: '💪' },
-  { slug: 'knowledge_seeker', name: 'Speed Learner', description: 'Complete 5 modules', icon_emoji: '⚡' },
-  { slug: 'scholar', name: 'Curious Mind', description: 'Complete 10 modules', icon_emoji: '🔭' },
-  { slug: 'streak_starter', name: 'On a Roll', description: '3-day streak', icon_emoji: '🎯' },
-  { slug: 'hot_streak', name: 'Week Warrior', description: '7-day streak', icon_emoji: '⚔️' },
-  { slug: 'dedicated', name: 'Dedicated', description: '14-day streak', icon_emoji: '🏆' },
+const BADGE_LOCKER = [
+  { slug: 'badge_first_leaf', name: 'First Leaf', description: 'Your very first concept mastered',       emoji: '🍀' },
+  { slug: 'badge_deep_root',  name: 'Deep Root',  description: '10 concepts in one module',              emoji: '🌾' },
+  { slug: 'badge_wildwood',   name: 'Wildwood',   description: '25 concepts in one module',              emoji: '🌿' },
+  { slug: 'badge_planter',    name: 'Planter',    description: '3 modules each with ≥1 concept',         emoji: '🪴' },
+  { slug: 'badge_explorer',   name: 'Explorer',   description: '10 concepts across 3 different modules', emoji: '🗺️' },
 ]
 
 export default function Profile() {
@@ -33,7 +31,6 @@ export default function Profile() {
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
 
-  // Notion state
   const [notionConnected, setNotionConnected] = useState(user?.notion_connected ?? false)
   const [notionWorkspace, setNotionWorkspace] = useState<string | null>(user?.notion_workspace_name ?? null)
   const [notionLoading, setNotionLoading] = useState(false)
@@ -45,8 +42,6 @@ export default function Profile() {
         const [s, a] = await Promise.all([getStreak(), getAchievements()])
         setStreak(s.data)
         setEarned(a.data)
-
-        // Refresh user to get latest notion status
         if (token) {
           const { data: me } = await getMe()
           setAuth(token, me)
@@ -60,7 +55,6 @@ export default function Profile() {
     }
     load()
 
-    // Handle redirect back from Notion OAuth
     const notionParam = searchParams.get('notion')
     if (notionParam === 'connected') {
       setNotionBanner('connected')
@@ -138,11 +132,13 @@ export default function Profile() {
   }
 
   const initials = user?.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) ?? '?'
+  const totalConcepts = streak?.total_concepts ?? 0
 
   return (
     <>
       <Navbar />
       <div className="max-w-2xl mx-auto px-6 py-8">
+
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <div className="w-14 h-14 rounded-full bg-green-600 flex items-center justify-center text-white font-bold text-xl">
@@ -154,30 +150,44 @@ export default function Profile() {
           </div>
         </div>
 
+        {/* Mastery Bar */}
+        <div className="mb-8 bg-white border-2 border-gray-100 rounded-2xl p-5">
+          <h2 className="text-lg font-bold text-forest-900 mb-4">Mastery</h2>
+          <MasteryBar totalConcepts={totalConcepts} />
+        </div>
+
         {/* Streak */}
         {streak && (
-          <div className="mb-8">
-            <StreakCounter current={streak.current_streak} longest={streak.longest_streak} />
+          <div className="mb-8 bg-white border-2 border-gray-100 rounded-2xl p-5">
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="text-lg font-bold text-forest-900">Streak</h2>
+              <div className="flex items-center gap-1">
+                <span className="text-2xl font-extrabold text-green-600">{streak.current_streak}</span>
+                <span className="text-sm text-gray-400 font-medium">day{streak.current_streak !== 1 ? 's' : ''}</span>
+                <span className="text-xs text-gray-300 ml-2">Best: {streak.longest_streak}</span>
+              </div>
+            </div>
+            <StreakBar currentStreak={streak.current_streak} earnedSlugs={earnedSlugs} />
           </div>
         )}
 
-        {/* Achievements */}
+        {/* Badge Locker */}
         <div className="mb-8">
-          <h2 className="text-lg font-bold text-forest-900 mb-4">Achievements</h2>
+          <h2 className="text-lg font-bold text-forest-900 mb-4">Badge Locker</h2>
           <div className="grid grid-cols-2 gap-3">
-            {ALL_ACHIEVEMENTS.map((a) => (
+            {BADGE_LOCKER.map((b) => (
               <AchievementBadge
-                key={a.slug}
-                emoji={a.icon_emoji}
-                name={a.name}
-                description={a.description}
-                locked={!earnedSlugs.has(a.slug)}
+                key={b.slug}
+                emoji={b.emoji}
+                name={b.name}
+                description={b.description}
+                locked={!earnedSlugs.has(b.slug)}
               />
             ))}
           </div>
         </div>
 
-        {/* Interests */}
+        {/* Learning Interests */}
         <div className="mb-8">
           <h2 className="text-lg font-bold text-forest-900 mb-1">Learning Interests</h2>
           <p className="text-sm text-gray-400 mb-4">Used to personalise your ELI5 explanations.</p>
@@ -185,16 +195,12 @@ export default function Profile() {
             {interests.map((i) => (
               <span
                 key={i}
-                className={`flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full border transition-colors ${
-                  saved
-                    ? 'bg-green-50 text-green-700 border-green-300'
-                    : 'bg-green-50 text-green-700 border-green-200'
-                }`}
+                className="flex items-center gap-1 text-sm font-medium px-3 py-1 rounded-full border bg-green-50 text-green-700 border-green-200"
               >
                 {i}
                 <button
                   onClick={() => removeInterest(i)}
-                  className={`ml-1 font-bold ${saved ? 'text-green-400 hover:text-green-700' : 'text-green-500 hover:text-green-700'}`}
+                  className="ml-1 font-bold text-green-500 hover:text-green-700"
                 >
                   ×
                 </button>
@@ -219,16 +225,14 @@ export default function Profile() {
           <button
             onClick={saveInterests}
             disabled={saving}
-            className={`mt-4 w-full font-extrabold py-3 rounded-2xl border-b-4 border-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight disabled:opacity-50 bg-green-600 text-white hover:bg-green-700`}
+            className="mt-4 w-full font-extrabold py-3 rounded-2xl border-b-4 border-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight disabled:opacity-50 bg-green-600 text-white hover:bg-green-700"
           >
             {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Interests'}
           </button>
-          {saveError && (
-            <p className="mt-2 text-sm text-red-500 text-center">{saveError}</p>
-          )}
+          {saveError && <p className="mt-2 text-sm text-red-500 text-center">{saveError}</p>}
         </div>
 
-        {/* Notion Integration */}
+        {/* Notion */}
         <div>
           <h2 className="text-lg font-bold text-forest-900 mb-1">Notion</h2>
           <p className="text-sm text-gray-400 mb-4">
@@ -251,9 +255,7 @@ export default function Profile() {
               <div className="flex items-center gap-3">
                 <span className="text-xl">N</span>
                 <div>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {notionWorkspace ?? 'Notion'}
-                  </p>
+                  <p className="text-sm font-semibold text-gray-800">{notionWorkspace ?? 'Notion'}</p>
                   <p className="text-xs text-green-600">Connected</p>
                 </div>
               </div>
@@ -276,6 +278,7 @@ export default function Profile() {
             </button>
           )}
         </div>
+
       </div>
     </>
   )

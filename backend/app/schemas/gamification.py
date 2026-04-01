@@ -7,6 +7,7 @@ class StreakResponse(BaseModel):
     current_streak: int
     longest_streak: int
     last_activity_date: date | None
+    total_concepts: int = 0
 
     model_config = {"from_attributes": True}
 
