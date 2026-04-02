@@ -65,7 +65,14 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 flex items-center justify-center px-6">
+    <div
+      className="min-h-screen flex items-center justify-center px-6 bg-green-50"
+      style={{
+        backgroundImage: 'url(/login-page-bg.jpeg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       <div className="bg-white rounded-2xl border-2 border-gray-200 p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🧠</div>
