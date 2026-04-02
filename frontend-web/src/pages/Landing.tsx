@@ -2,7 +2,14 @@ import { Link } from 'react-router-dom'
 
 export default function Landing() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 to-yellow-50 flex flex-col items-center justify-center px-6">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-6 bg-green-50"
+      style={{
+        backgroundImage: 'url(/login-page-bg.jpeg)',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
       <div className="max-w-2xl text-center">
         <div className="text-6xl mb-6">🧠</div>
         <h1 className="text-5xl font-extrabold text-forest-900 mb-4 leading-tight">

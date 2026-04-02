@@ -73,7 +73,7 @@ export default function Login() {
         backgroundPosition: 'center',
       }}
     >
-      <div className="bg-white rounded-2xl border-2 border-gray-200 p-8 w-full max-w-md">
+      <div className="bg-green-50 rounded-2xl border-2 border-green-200 p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🧠</div>
           <h1 className="text-2xl font-bold text-forest-900">Welcome back</h1>
