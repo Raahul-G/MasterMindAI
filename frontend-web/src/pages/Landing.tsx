@@ -2,15 +2,14 @@ import { Link } from 'react-router-dom'
 
 export default function Landing() {
   return (
-    <div
-      className="min-h-screen flex flex-col items-center justify-center px-6 bg-green-50"
-      style={{
-        backgroundImage: 'url(/login-page-bg.jpeg)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
-      <div className="max-w-2xl text-center">
+    <div className="relative min-h-screen flex flex-col items-center justify-center px-6">
+      <img
+        src="/breeze.webp"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div className="relative z-10 max-w-2xl text-center">
         <div className="text-6xl mb-6">🧠</div>
         <h1 className="text-5xl font-extrabold text-forest-900 mb-4 leading-tight">
           Learn anything.<br />
@@ -34,17 +33,17 @@ export default function Landing() {
           </Link>
         </div>
         <div className="mt-16 grid grid-cols-3 gap-6 text-center">
-          <div className="bg-white rounded-2xl p-5 border-2 border-gray-200">
+          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-white/40">
             <div className="text-3xl mb-2">📖</div>
             <p className="font-semibold text-gray-800">Adaptive Lessons</p>
             <p className="text-sm text-gray-400 mt-1">Passages tailored to your level</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 border-2 border-gray-200">
+          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-white/40">
             <div className="text-3xl mb-2">✅</div>
             <p className="font-semibold text-gray-800">Smart Quizzes</p>
             <p className="text-sm text-gray-400 mt-1">Identifies exactly what you missed</p>
           </div>
-          <div className="bg-white rounded-2xl p-5 border-2 border-gray-200">
+          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 border border-white/40">
             <div className="text-3xl mb-2">🔥</div>
             <p className="font-semibold text-gray-800">Daily Streaks</p>
             <p className="text-sm text-gray-400 mt-1">Build the habit of learning</p>
@@ -54,3 +53,4 @@ export default function Landing() {
     </div>
   )
 }
+

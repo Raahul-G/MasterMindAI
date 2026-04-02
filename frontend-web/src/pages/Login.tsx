@@ -65,15 +65,14 @@ export default function Login() {
   }
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center px-6 bg-green-50"
-      style={{
-        backgroundImage: 'url(/login-page-bg.jpeg)',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
-    >
-      <div className="bg-green-50 rounded-2xl border-2 border-green-200 p-8 w-full max-w-md">
+    <div className="relative min-h-screen flex items-center justify-center px-6">
+      <img
+        src="/breeze.webp"
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full object-cover"
+      />
+      <div className="relative z-10 bg-white/70 backdrop-blur-md rounded-2xl border border-white/40 p-8 w-full max-w-md">
         <div className="text-center mb-6">
           <div className="text-4xl mb-2">🧠</div>
           <h1 className="text-2xl font-bold text-forest-900">Welcome back</h1>
