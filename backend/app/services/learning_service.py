@@ -265,13 +265,25 @@ async def resume_module(
     passage = passage_result.scalars().first()
 
     if not passage:
-        # All completed — resume at last passage
-        last_result = await db.execute(
+        # All completed — generate a fresh pair instead of replaying old content
+        completed_result = await db.execute(
             select(Passage)
             .where(Passage.module_id == module_id)
-            .order_by(Passage.order_index.desc())
+            .order_by(Passage.order_index)
         )
-        passage = last_result.scalars().first()
+        all_passages = completed_result.scalars().all()
+        if not all_passages:
+            raise HTTPException(status_code=404, detail="No passages found for this module")
+        covered = [p.concept_title for p in all_passages]
+        next_pair = await generate_next_pair(module_id, covered, db)
+        return StartModuleResponse(
+            module_id=module.id,
+            eli5_text=module.eli5_text,
+            current_passage=next_pair.current_passage,
+            quiz_id=next_pair.quiz_id,
+            questions=next_pair.questions,
+            concepts_learned=next_pair.concepts_learned,
+        )
 
     if not passage:
         raise HTTPException(status_code=404, detail="No passages found for this module")

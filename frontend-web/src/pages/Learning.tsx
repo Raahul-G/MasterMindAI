@@ -13,6 +13,7 @@ type Phase =
   | 'quizzing'
   | 'submitting'
   | 'failed'
+  | 'concept_passed'
   | 'remediating_loading'
   | 'remediating'
   | 'retry_loading'
@@ -66,6 +67,9 @@ export default function Learning() {
   const [remediations, setRemediations] = useState<Remediation[]>([])
   const [activeQuizId, setActiveQuizId] = useState<string>(quizId ?? '')
   const [activeQuestions, setActiveQuestions] = useState<Question[]>(questions)
+  const [pendingPassage, setPendingPassage] = useState<typeof currentPassage | null>(null)
+  const [pendingQuizId, setPendingQuizId] = useState<string>('')
+  const [pendingQuestions, setPendingQuestions] = useState<Question[]>([])
 
   const navigate = useNavigate()
 
@@ -94,13 +98,11 @@ export default function Learning() {
       }
 
       if (data.next_passage && data.next_quiz_id && data.next_questions.length > 0) {
-        // Auto-advance to next passage in same pair
-        setPassage(data.next_passage, data.next_quiz_id, data.next_questions, data.concepts_learned)
-        setAnswers({})
-        setActiveQuizId(data.next_quiz_id)
-        setActiveQuestions(data.next_questions)
-        setScore(null)
-        setPhase('reading')
+        // Pause on score screen before advancing to next concept in pair
+        setPendingPassage(data.next_passage)
+        setPendingQuizId(data.next_quiz_id)
+        setPendingQuestions(data.next_questions)
+        setPhase('concept_passed')
         return
       }
 
@@ -157,6 +159,17 @@ export default function Learning() {
     } catch {
       setPhase('needs_pair')
     }
+  }
+
+  const handleNextConcept = () => {
+    if (!pendingPassage) return
+    setPassage(pendingPassage, pendingQuizId, pendingQuestions, conceptsLearned)
+    setAnswers({})
+    setActiveQuizId(pendingQuizId)
+    setActiveQuestions(pendingQuestions)
+    setScore(null)
+    setPendingPassage(null)
+    setPhase('reading')
   }
 
   return (
@@ -257,6 +270,29 @@ export default function Learning() {
               className="w-full bg-orange-500 text-white font-extrabold py-4 rounded-2xl border-b-4 border-orange-600 hover:bg-orange-600 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight text-lg"
             >
               See new explanation
+            </button>
+          </div>
+        )}
+
+        {/* CONCEPT PASSED PHASE (score screen between concepts in a pair) */}
+        {phase === 'concept_passed' && score && (
+          <div className="flex flex-col gap-4 text-center">
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+              <p className="text-3xl font-extrabold text-green-600 mb-1">{score.correct}/{score.total}</p>
+              <p className="text-sm text-green-600 font-bold uppercase tracking-wide">Concept mastered!</p>
+              <p className="text-gray-400 text-sm mt-1">{conceptsLearned} concepts learned so far</p>
+            </div>
+            <button
+              onClick={handleNextConcept}
+              className="w-full bg-green-600 text-white font-extrabold py-4 rounded-2xl border-b-4 border-green-700 hover:bg-green-700 active:translate-y-[2px] active:border-b-2 transition-[transform,border-bottom-width] duration-75 tracking-tight text-lg"
+            >
+              Next concept
+            </button>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="w-full bg-white text-gray-500 font-bold py-3 rounded-2xl border border-gray-200 hover:border-gray-300 text-sm"
+            >
+              Save and exit
             </button>
           </div>
         )}
