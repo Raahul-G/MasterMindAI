@@ -177,7 +177,7 @@ async def generate_quiz_for_passage(
 
 async def generate_next_pair(
     module_id: uuid.UUID,
-    covered_concepts: list[str],
+    covered_concepts: list[str] | None,
     db: AsyncSession,
 ) -> NextPairResponse:
     """
@@ -196,11 +196,20 @@ async def generate_next_pair(
     )
     max_index = max_result.scalar() or 0
 
+    # Fetch all completed concept titles from DB — don't rely on frontend list
+    completed_result = await db.execute(
+        select(Passage)
+        .where(Passage.module_id == module_id, Passage.status == "completed")
+        .order_by(Passage.order_index)
+    )
+    db_covered = [p.concept_title for p in completed_result.scalars().all()]
+    effective_covered = db_covered if db_covered else (covered_concepts or [])
+
     raw_passages = await ai_service.generate_passages(
         module.topic,
         module.level,
         module.eli5_text,
-        covered_concepts=covered_concepts,
+        covered_concepts=effective_covered,
     )
 
     new_passages = []

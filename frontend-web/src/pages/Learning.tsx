@@ -144,11 +144,8 @@ export default function Learning() {
 
   const handleNextPair = async () => {
     setPhase('pair_loading')
-    const coveredConcepts = useLearningStore.getState().currentPassage
-      ? [useLearningStore.getState().currentPassage!.concept_title]
-      : []
     try {
-      const { data } = await nextPair(moduleId, coveredConcepts)
+      const { data } = await nextPair(moduleId, [])
       setPassage(data.current_passage, data.quiz_id, data.questions, data.concepts_learned)
       setAnswers({})
       setActiveQuizId(data.quiz_id)

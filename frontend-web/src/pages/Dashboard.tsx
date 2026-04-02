@@ -22,17 +22,23 @@ export default function Dashboard() {
   const [modules, setModules] = useState<Module[]>([])
   const [streak, setStreak] = useState<Streak | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingModuleId, setLoadingModuleId] = useState<string | null>(null)
+  const [errorModuleId, setErrorModuleId] = useState<string | null>(null)
   const { user, setAuth, token } = useAuthStore()
   const setStart = useLearningStore((s) => s.setStart)
   const navigate = useNavigate()
 
   const handleContinue = async (mod: Module) => {
+    setLoadingModuleId(mod.id)
+    setErrorModuleId(null)
     try {
       const { data } = await resumeModule(mod.id)
       setStart(data)
       navigate('/learn')
     } catch {
-      navigate('/learn/start')
+      setErrorModuleId(mod.id)
+    } finally {
+      setLoadingModuleId(null)
     }
   }
 
@@ -87,38 +93,43 @@ export default function Dashboard() {
         ) : (
           <div className="grid gap-4">
             {modules.map((mod) => (
-              <div
-                key={mod.id}
-                className="bg-white border-2 border-gray-200 rounded-2xl p-5 flex items-center justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLORS[mod.level]}`}>
-                      {LEVEL_LABELS[mod.level]}
-                    </span>
-                    <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
-                      {mod.concepts_learned} concept{mod.concepts_learned !== 1 ? 's' : ''} learned
-                    </span>
+              <div key={mod.id}>
+                <div className="bg-white border-2 border-gray-200 rounded-2xl p-5 flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${LEVEL_COLORS[mod.level]}`}>
+                        {LEVEL_LABELS[mod.level]}
+                      </span>
+                      <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-full">
+                        {mod.concepts_learned} concept{mod.concepts_learned !== 1 ? 's' : ''} learned
+                      </span>
+                    </div>
+                    <h3 className="font-semibold text-forest-900">{mod.topic}</h3>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(mod.created_at).toLocaleDateString()}
+                    </p>
                   </div>
-                  <h3 className="font-semibold text-forest-900">{mod.topic}</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(mod.created_at).toLocaleDateString()}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/modules/${mod.id}/review`)}
+                      className="text-sm text-gray-400 font-medium hover:underline"
+                    >
+                      Review
+                    </button>
+                    <button
+                      onClick={() => handleContinue(mod)}
+                      disabled={loadingModuleId !== null}
+                      className="text-sm text-green-600 font-medium hover:underline disabled:opacity-40"
+                    >
+                      {loadingModuleId === mod.id ? 'Loading...' : 'Continue'}
+                    </button>
+                  </div>
+                </div>
+                {errorModuleId === mod.id && (
+                  <p className="text-xs text-red-500 mt-2 px-1">
+                    Couldn't resume — please try again.
                   </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/modules/${mod.id}/review`)}
-                    className="text-sm text-gray-400 font-medium hover:underline"
-                  >
-                    Review
-                  </button>
-                  <button
-                    onClick={() => handleContinue(mod)}
-                    className="text-sm text-green-600 font-medium hover:underline"
-                  >
-                    Continue
-                  </button>
-                </div>
+                )}
               </div>
             ))}
           </div>
