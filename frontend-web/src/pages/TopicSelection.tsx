@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import Navbar from '../components/Navbar'
-import LoadingSpinner from '../components/LoadingSpinner'
+import ThinkingCard from '../components/ThinkingCard'
 import { startModule } from '../api/learning'
 import { useLearningStore } from '../store/learningStore'
 
@@ -10,6 +10,14 @@ const LEVELS = [
   { id: 'intermediate', label: 'Intermediate', desc: 'University or curious adult', emoji: '🎓' },
   { id: 'expert', label: 'Expert', desc: 'Graduate level', emoji: '🔬' },
 ] as const
+
+const CONCEPT_THOUGHTS = [
+  { icon: '🧐', text: "Reading the 'grown-up' version..." },
+  { icon: '🔍', text: 'Identifying the tricky concepts...' },
+  { icon: '💡', text: 'Searching for a perfect analogy...' },
+  { icon: '✂️', text: 'Replacing big words with small ones...' },
+  { icon: '✨', text: 'Making it easy to understand...' },
+]
 
 export default function TopicSelection() {
   const location = useLocation()
@@ -93,7 +101,7 @@ export default function TopicSelection() {
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           {loading ? (
-            <LoadingSpinner />
+            <ThinkingCard thoughts={CONCEPT_THOUGHTS} />
           ) : (
             <button
               type="submit"

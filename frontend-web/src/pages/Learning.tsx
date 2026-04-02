@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import PassageCard from '../components/PassageCard'
 import QuizCard from '../components/QuizCard'
-import LoadingSpinner from '../components/LoadingSpinner'
+import ThinkingCard from '../components/ThinkingCard'
 import { submitQuiz, remediate, generateQuiz, nextPair } from '../api/learning'
 import { useLearningStore } from '../store/learningStore'
 import type { AnswerSubmission, Remediation, Question } from '../types'
@@ -13,11 +13,39 @@ type Phase =
   | 'quizzing'
   | 'submitting'
   | 'failed'
+  | 'remediating_loading'
   | 'remediating'
   | 'retry_loading'
   | 'passed'
   | 'pair_loading'
   | 'needs_pair'
+
+const CONCEPT_THOUGHTS = [
+  { icon: '🧐', text: "Reading the 'grown-up' version..." },
+  { icon: '🔍', text: 'Identifying the tricky concepts...' },
+  { icon: '💡', text: 'Searching for a perfect analogy...' },
+  { icon: '✂️', text: 'Replacing big words with small ones...' },
+  { icon: '✨', text: 'Making it easy to understand...' },
+]
+
+const QUIZ_THOUGHTS = [
+  { icon: '📝', text: 'Reading your explanation carefully...' },
+  { icon: '🎯', text: 'Finding what matters most...' },
+  { icon: '🤔', text: 'Crafting tricky questions...' },
+  { icon: '✅', text: 'Double-checking the answers...' },
+]
+
+const SUBMIT_THOUGHTS = [
+  { icon: '📊', text: 'Checking your answers...' },
+  { icon: '🧮', text: 'Calculating your score...' },
+]
+
+const REMEDIATION_THOUGHTS = [
+  { icon: '🔄', text: 'Finding a different angle...' },
+  { icon: '🎨', text: 'Crafting a new analogy...' },
+  { icon: '📖', text: 'Rewriting with fresh examples...' },
+  { icon: '✨', text: 'Making it clearer this time...' },
+]
 
 export default function Learning() {
   const {
@@ -88,10 +116,11 @@ export default function Learning() {
   }
 
   const handleRemediate = async () => {
-    setPhase('remediating')
+    setPhase('remediating_loading')
     try {
       const { data } = await remediate(moduleId, activeQuizId, failedConcepts)
       setRemediations(data.remediations)
+      setPhase('remediating')
     } catch {
       setPhase('failed')
     }
@@ -204,10 +233,11 @@ export default function Learning() {
           </>
         )}
 
-        {/* SUBMITTING / LOADING */}
-        {(phase === 'submitting' || phase === 'retry_loading' || phase === 'pair_loading') && (
-          <LoadingSpinner />
-        )}
+        {/* THINKING STATES */}
+        {phase === 'submitting' && <ThinkingCard thoughts={SUBMIT_THOUGHTS} intervalMs={1500} />}
+        {phase === 'pair_loading' && <ThinkingCard thoughts={CONCEPT_THOUGHTS} />}
+        {phase === 'retry_loading' && <ThinkingCard thoughts={QUIZ_THOUGHTS} />}
+        {phase === 'remediating_loading' && <ThinkingCard thoughts={REMEDIATION_THOUGHTS} />}
 
         {/* FAILED PHASE */}
         {phase === 'failed' && score && (
