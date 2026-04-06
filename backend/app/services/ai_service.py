@@ -9,12 +9,26 @@ Architecture:
 """
 
 import json
+import re
 from typing import TypedDict
 
 from langchain_core.messages import HumanMessage
 from langgraph.graph import END, START, StateGraph
 
 from app.core.llm import get_llm
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _parse_json(text: str):
+    """Strip markdown code fences before parsing JSON."""
+    text = text.strip()
+    if text.startswith("```"):
+        text = re.sub(r'^```(?:json)?\s*', '', text)
+        text = re.sub(r'\s*```$', '', text)
+    return json.loads(text.strip())
 
 
 # ---------------------------------------------------------------------------
@@ -126,7 +140,7 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
 
     llm = get_llm(temperature=0.5, max_tokens=2000)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return {"passages": json.loads(response.content.strip())}
+    return {"passages": _parse_json(response.content)}
 
 
 async def _quiz_node(state: LearningState) -> dict:
@@ -181,7 +195,7 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
 
     llm = get_llm(temperature=0.4, max_tokens=2000)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return {"quiz_questions": json.loads(response.content.strip())}
+    return {"quiz_questions": _parse_json(response.content)}
 
 
 async def _remediation_node(state: LearningState) -> dict:
@@ -227,7 +241,7 @@ Return ONLY the JSON array. No explanation, no markdown code blocks, no extra te
 
     llm = get_llm(temperature=0.7, max_tokens=1500)
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return {"remediations": json.loads(response.content.strip())}
+    return {"remediations": _parse_json(response.content)}
 
 
 # ---------------------------------------------------------------------------
