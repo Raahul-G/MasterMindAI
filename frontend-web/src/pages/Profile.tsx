@@ -20,7 +20,7 @@ const BADGE_LOCKER = [
 ]
 
 export default function Profile() {
-  const { user, token, setAuth } = useAuthStore()
+  const { user, token, refreshToken, setAuth } = useAuthStore()
   const [searchParams, setSearchParams] = useSearchParams()
   const [streak, setStreak] = useState<Streak | null>(null)
   const [earned, setEarned] = useState<Achievement[]>([])
@@ -44,7 +44,7 @@ export default function Profile() {
         setEarned(a.data)
         if (token) {
           const { data: me } = await getMe()
-          setAuth(token, me)
+          setAuth(token, refreshToken ?? '', me)
           setInterests(me.interest_topics ?? [])
           setNotionConnected(me.notion_connected)
           setNotionWorkspace(me.notion_workspace_name)
@@ -87,7 +87,7 @@ export default function Profile() {
     setSaveError(null)
     try {
       const { data } = await updateInterests(interests)
-      setAuth(token, data)
+      setAuth(token, refreshToken ?? '', data)
       setSaved(true)
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } }; message?: string }
@@ -115,7 +115,7 @@ export default function Profile() {
       setNotionConnected(false)
       setNotionWorkspace(null)
       if (user && token) {
-        setAuth(token, { ...user, notion_connected: false, notion_workspace_name: null })
+        setAuth(token, refreshToken ?? '', { ...user, notion_connected: false, notion_workspace_name: null })
       }
     } finally {
       setNotionLoading(false)

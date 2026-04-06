@@ -12,7 +12,9 @@ Auto-export:
 """
 
 import base64
+import logging
 import uuid
+from datetime import timezone
 from urllib.parse import urlencode
 
 import httpx
@@ -21,6 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.learning import Answer, Module, Passage, Question, Quiz, Remediation
+from app.models.user import User
+
+logger = logging.getLogger(__name__)
 
 NOTION_API_VERSION = "2022-06-28"
 NOTION_TOKEN_URL = "https://api.notion.com/v1/oauth/token"
@@ -205,6 +210,194 @@ async def create_module_subpage(
         response.raise_for_status()
 
     return response.json()["url"]
+
+
+# ---------------------------------------------------------------------------
+# Incremental concept sync (auto-called after each quiz pass)
+# ---------------------------------------------------------------------------
+
+async def _create_module_page_shell(
+    access_token: str,
+    mastermind_page_id: str,
+    module: Module,
+) -> str:
+    """
+    Creates a module subpage shell (metadata + ELI5 + 'Core Concepts' heading).
+    Returns the new Notion page ID (not URL — we need the ID for PATCH appends).
+    """
+    started = module.created_at.strftime("%Y-%m-%d") if module.created_at else "—"
+    children = [
+        {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"type": "text", "text": {
+                    "content": f"Level: {module.level.capitalize()}   |   Started: {started}"
+                }}],
+                "icon": {"type": "emoji", "emoji": "📅"},
+                "color": "gray_background",
+            },
+        },
+        _divider(),
+        _heading2("The Simple Version"),
+        _paragraph(module.eli5_text or ""),
+        _divider(),
+        _heading2("Core Concepts"),
+    ]
+
+    async with httpx.AsyncClient() as client:
+        response = await client.post(
+            "https://api.notion.com/v1/pages",
+            json={
+                "parent": {"type": "page_id", "page_id": mastermind_page_id},
+                "icon": {"type": "emoji", "emoji": "📖"},
+                "properties": {
+                    "title": {
+                        "title": [{"type": "text", "text": {"content": module.topic}}]
+                    }
+                },
+                "children": children,
+            },
+            headers=_headers(access_token),
+        )
+        response.raise_for_status()
+
+    return response.json()["id"]
+
+
+def _build_concept_blocks(
+    passage: Passage,
+    quiz: Quiz,
+    questions_answers: list[dict],
+    remediations: list[dict],
+) -> list[dict]:
+    """Returns Notion blocks for one completed concept."""
+    mastered_date = (
+        quiz.submitted_at.astimezone(timezone.utc).strftime("%Y-%m-%d")
+        if quiz.submitted_at
+        else "—"
+    )
+    blocks: list[dict] = [
+        _divider(),
+        _heading3(passage.concept_title),
+        {
+            "object": "block",
+            "type": "callout",
+            "callout": {
+                "rich_text": [{"type": "text", "text": {
+                    "content": (
+                        f"Mastered: {mastered_date}   |   "
+                        f"Score: {quiz.score}/{quiz.total_questions}   |   "
+                        f"Attempt #{quiz.attempt_number}"
+                    )
+                }}],
+                "icon": {"type": "emoji", "emoji": "📊"},
+                "color": "green_background",
+            },
+        },
+        _paragraph(passage.content or ""),
+    ]
+
+    if questions_answers:
+        blocks.append(_heading3("Quiz Results"))
+        for i, qa in enumerate(questions_answers, 1):
+            marker = "✓" if qa["is_correct"] else "✗"
+            blocks.append(_paragraph(f"Q{i}: {qa['question_text']}"))
+            blocks.append(_paragraph(f"Correct answer: {qa['correct_answer']}"))
+            if qa["user_answer"]:
+                blocks.append(_paragraph(f"Your answer: {qa['user_answer']} {marker}"))
+
+    if remediations:
+        blocks.append(_heading3("Extra Help"))
+        for r in remediations:
+            blocks.append(_paragraph(r["content"]))
+
+    return blocks
+
+
+async def sync_concept_to_notion(
+    user_id: uuid.UUID,
+    module_id: uuid.UUID,
+    passage_id: uuid.UUID,
+    quiz_id: uuid.UUID,
+    db: AsyncSession,
+) -> None:
+    """
+    Appends a completed concept to the module's Notion subpage.
+    Creates the subpage shell on first concept. Silently no-ops if the
+    user has no Notion token. Never raises — all errors are logged as warnings.
+    """
+    try:
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user or not user.notion_access_token or not user.notion_mastermind_page_id:
+            return
+
+        module_result = await db.execute(select(Module).where(Module.id == module_id))
+        module = module_result.scalar_one_or_none()
+        if not module:
+            return
+
+        passage_result = await db.execute(select(Passage).where(Passage.id == passage_id))
+        passage = passage_result.scalar_one_or_none()
+        if not passage:
+            return
+
+        quiz_result = await db.execute(select(Quiz).where(Quiz.id == quiz_id))
+        quiz = quiz_result.scalar_one_or_none()
+        if not quiz:
+            return
+
+        # Create page shell on first concept
+        if not module.notion_page_id:
+            page_id = await _create_module_page_shell(
+                access_token=user.notion_access_token,
+                mastermind_page_id=user.notion_mastermind_page_id,
+                module=module,
+            )
+            module.notion_page_id = page_id
+            await db.commit()
+
+        # Build Q&A list for this quiz
+        q_result = await db.execute(
+            select(Question).where(Question.quiz_id == quiz_id).order_by(Question.order_index)
+        )
+        questions = q_result.scalars().all()
+
+        a_result = await db.execute(select(Answer).where(Answer.quiz_id == quiz_id))
+        answer_map = {a.question_id: a for a in a_result.scalars().all()}
+
+        questions_answers = [
+            {
+                "question_text": q.question_text,
+                "correct_answer": q.correct_answer,
+                "user_answer": answer_map[q.id].user_answer if q.id in answer_map else None,
+                "is_correct": answer_map[q.id].is_correct if q.id in answer_map else None,
+            }
+            for q in questions
+        ]
+
+        # Load remediations for this passage
+        rem_result = await db.execute(
+            select(Remediation).where(
+                Remediation.module_id == module_id,
+                Remediation.passage_id == passage_id,
+            )
+        )
+        remediations = [{"content": r.content} for r in rem_result.scalars().all()]
+
+        blocks = _build_concept_blocks(passage, quiz, questions_answers, remediations)
+
+        async with httpx.AsyncClient() as client:
+            response = await client.patch(
+                f"https://api.notion.com/v1/blocks/{module.notion_page_id}/children",
+                json={"children": blocks},
+                headers=_headers(user.notion_access_token),
+            )
+            response.raise_for_status()
+
+    except Exception as exc:
+        logger.warning("sync_concept_to_notion failed for module %s: %s", module_id, exc)
 
 
 # ---------------------------------------------------------------------------

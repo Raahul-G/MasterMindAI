@@ -24,7 +24,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [loadingModuleId, setLoadingModuleId] = useState<string | null>(null)
   const [errorModuleId, setErrorModuleId] = useState<string | null>(null)
-  const { user, setAuth, token } = useAuthStore()
+  const { user, setAuth, token, refreshToken } = useAuthStore()
   const setStart = useLearningStore((s) => s.setStart)
   const navigate = useNavigate()
 
@@ -50,7 +50,7 @@ export default function Dashboard() {
         setStreak(streakRes.data)
         if (!user && token) {
           const { data: me } = await getMe()
-          setAuth(token, me)
+          setAuth(token, refreshToken ?? '', me)
         }
       } catch {
         // token expired — let ProtectedRoute handle

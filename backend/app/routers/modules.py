@@ -209,21 +209,27 @@ async def export_notion(
 
     from app.services import notion_service  # imported here to avoid circular on missing creds
 
-    markdown = await markdown_service.generate_module_markdown(module_id, db)
-    try:
-        page_url = await notion_service.create_page(
-            access_token=current_user.notion_access_token,
-            topic=module.topic,
-            markdown_content=markdown,
+    if not current_user.notion_mastermind_page_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Notion MasterMind root page not found. Reconnect Notion via GET /notion/auth-url.",
         )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        page_url = await notion_service.create_module_subpage(
+            access_token=current_user.notion_access_token,
+            mastermind_page_id=current_user.notion_mastermind_page_id,
+            module_id=module_id,
+            db=db,
+        )
     except Exception as e:
         import logging
         logging.getLogger(__name__).error("Notion API error for module %s: %s", module_id, e)
         raise HTTPException(status_code=502, detail="Failed to export to Notion. Please try again.")
 
-    module.notion_page_id = page_url.split("/")[-1]
+    # page_url is the full Notion URL; extract the ID (last path segment, strip hyphens)
+    raw_id = page_url.rstrip("/").split("/")[-1].split("-")[-1]
+    module.notion_page_id = raw_id
     await db.commit()
 
     return ExportNotionResponse(notion_page_url=page_url)

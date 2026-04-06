@@ -33,9 +33,8 @@ export default function Register() {
     setLoading(true)
     try {
       const { data } = await register(email, password, fullName)
-      localStorage.setItem('access_token', data.access_token)
       const { data: user } = await getMe()
-      setAuth(data.access_token, user)
+      setAuth(data.access_token, data.refresh_token, user)
       navigate('/dashboard')
     } catch (err) {
       setError(getErrorMessage(err))

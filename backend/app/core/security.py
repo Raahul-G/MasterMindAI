@@ -1,3 +1,5 @@
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from jose import JWTError, jwt
@@ -31,3 +33,13 @@ def decode_access_token(token: str) -> str | None:
         return payload.get("sub")
     except JWTError:
         return None
+
+
+def generate_refresh_token() -> str:
+    """Generates a cryptographically random 32-byte URL-safe opaque token."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_token(token: str) -> str:
+    """Returns the SHA-256 hex digest of a token. Only the hash is stored in the DB."""
+    return hashlib.sha256(token.encode()).hexdigest()

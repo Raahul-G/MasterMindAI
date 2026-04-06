@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.learning import Answer, Module, Passage, Question, Quiz
 from app.models.user import User
 from app.schemas.learning import AnswerSubmission, PassageResponse, QuestionResponse
-from app.services import achievement_service, ai_service, feed_service, streak_service
+from app.services import achievement_service, ai_service, feed_service, notion_service, streak_service
 
 logger = logging.getLogger(__name__)
 
@@ -181,6 +181,14 @@ async def score_quiz(
                     "level": module.level,
                     "concept": current_passage.concept_title if current_passage else "",
                 },
+                db=db,
+            )
+
+            await notion_service.sync_concept_to_notion(
+                user_id=module.user_id,
+                module_id=module.id,
+                passage_id=current_passage.id,
+                quiz_id=quiz_id,
                 db=db,
             )
         except Exception as exc:
