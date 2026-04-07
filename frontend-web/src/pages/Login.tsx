@@ -33,6 +33,7 @@ export default function Login() {
     setLoading(true)
     try {
       const { data } = await login(email, password)
+      localStorage.setItem('access_token', data.access_token)
       const { data: user } = await getMe()
       setAuth(data.access_token, data.refresh_token, user)
       navigate('/dashboard')
@@ -52,6 +53,7 @@ export default function Login() {
     setLoading(true)
     try {
       const { data } = await googleLogin(credentialResponse.credential)
+      localStorage.setItem('access_token', data.access_token)
       const { data: user } = await getMe()
       setAuth(data.access_token, data.refresh_token, user)
       navigate('/dashboard')
