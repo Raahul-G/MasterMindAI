@@ -158,3 +158,23 @@ class ModuleReviewResponse(BaseModel):
     quiz_total: int | None
     quiz_attempts: int | None
     questions: list[ReviewQuestionResponse]
+
+
+class GraphNode(BaseModel):
+    id: uuid.UUID
+    label: str
+    pos_x: float | None = None
+    pos_y: float | None = None
+    pos_z: float | None = None
+    hub_score: int = 1
+    module_ids: list[uuid.UUID] = []
+
+    model_config = {"from_attributes": True}
+
+
+class GraphResponse(BaseModel):
+    nodes: list[GraphNode] = []
+
+
+class PopulateGraphResponse(BaseModel):
+    populated: int

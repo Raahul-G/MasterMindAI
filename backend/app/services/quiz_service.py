@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.learning import Answer, Module, Passage, Question, Quiz
 from app.models.user import User
 from app.schemas.learning import AnswerSubmission, PassageResponse, QuestionResponse
-from app.services import achievement_service, ai_service, feed_service, notion_service, streak_service
+from app.services import achievement_service, ai_service, feed_service, graph_service, notion_service, streak_service
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +191,15 @@ async def score_quiz(
                 quiz_id=quiz_id,
                 db=db,
             )
+
+            if current_passage:
+                await graph_service.embed_and_upsert(
+                    user_id=module.user_id,
+                    concept_title=current_passage.concept_title,
+                    content=current_passage.content,
+                    module_id=module.id,
+                    db=db,
+                )
         except Exception as exc:
             logger.warning("Post-completion side-effects failed for quiz %s: %s", quiz_id, exc)
 

@@ -12,7 +12,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.core.limiter import limiter
-from app.routers import auth, gamification, learning, modules, notion, social
+from app.routers import auth, gamification, graph, learning, modules, notion, social
 
 if settings.SENTRY_DSN:
     sentry_sdk.init(
@@ -99,6 +99,7 @@ app.include_router(modules.router)
 app.include_router(notion.router)
 app.include_router(gamification.router)
 app.include_router(social.router)
+app.include_router(graph.router)
 
 
 @app.get("/health")

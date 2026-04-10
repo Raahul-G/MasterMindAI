@@ -1,9 +1,11 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
 from sqlalchemy import DateTime
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -118,3 +120,17 @@ class Remediation(Base):
     quiz: Mapped["Quiz"] = relationship("Quiz", back_populates="remediations")
 
 
+class ConceptEmbedding(Base):
+    __tablename__ = "concept_embeddings"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    canonical_concept: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[Any] = mapped_column(Vector(1536), nullable=True)
+    pos_x: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pos_y: Mapped[float | None] = mapped_column(Float, nullable=True)
+    pos_z: Mapped[float | None] = mapped_column(Float, nullable=True)
+    hub_score: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    module_ids: Mapped[Any] = mapped_column(ARRAY(UUID(as_uuid=True)), nullable=False, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
