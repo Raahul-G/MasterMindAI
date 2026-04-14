@@ -154,6 +154,12 @@ async def score_quiz(
     concepts_learned = await _count_concepts_learned(quiz.module_id, db) if quiz else 0
 
     # 2. Fire streak + achievements on concept completion
+    # Snapshot PKs before the try block — if rollback() is called, SQLAlchemy expires all
+    # loaded ORM objects. Accessing their attributes in async context then raises
+    # "greenlet_spawn has not been called" (async lazy-load not supported).
+    _passage_id = current_passage.id if current_passage else None
+    _module_id = module.id if module else None
+
     if quiz and module:
         try:
             streak = await streak_service.update_streak(module.user_id, db, local_date)
@@ -202,7 +208,15 @@ async def score_quiz(
                 )
         except Exception as exc:
             logger.warning("Post-completion side-effects failed for quiz %s: %s", quiz_id, exc)
-            await db.rollback()  # Restore session so subsequent DB ops in this request still work
+            await db.rollback()
+            # Re-fetch ORM objects that were expired by rollback, so the "find next passage"
+            # step below can access their attributes without triggering async lazy-load errors.
+            if _passage_id:
+                r = await db.execute(select(Passage).where(Passage.id == _passage_id))
+                current_passage = r.scalar_one_or_none()
+            if _module_id:
+                r = await db.execute(select(Module).where(Module.id == _module_id))
+                module = r.scalar_one_or_none()
 
     # 3. Look for next passage in same module (order_index + 1)
     next_passage: Passage | None = None
