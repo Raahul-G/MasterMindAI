@@ -55,18 +55,23 @@ async def _insert_embedding(
     embedding: list[float],
     module_id: uuid.UUID,
 ) -> None:
-    """Insert a new concept embedding row using raw SQL to avoid asyncpg codec issues."""
+    """Insert a new concept embedding row using raw SQL to avoid asyncpg codec issues.
+
+    The vector literal is inlined directly into the SQL string (not passed as a parameter)
+    because asyncpg rejects string parameters for the vector type even with CAST.
+    The value is safe to inline — it is a list of floats from OpenAI with no user input.
+    """
+    vec_literal = _vec_str(embedding)
     await db.execute(
-        sa_text("""
+        sa_text(f"""
             INSERT INTO concept_embeddings
                 (id, user_id, canonical_concept, embedding, hub_score, module_ids, created_at, updated_at)
             VALUES
-                (gen_random_uuid(), :uid, :canonical, CAST(:emb AS vector), 1, :mids, now(), now())
+                (gen_random_uuid(), :uid, :canonical, '{vec_literal}'::vector, 1, :mids, now(), now())
         """),
         {
             "uid": user_id,
             "canonical": canonical,
-            "emb": _vec_str(embedding),
             "mids": [module_id],
         },
     )
@@ -141,29 +146,29 @@ async def compute_positions_for_user(user_id: uuid.UUID, db: AsyncSession) -> No
     embeddings = np.array([_parse_vec(r.embedding) for r in rows], dtype=np.float32)
     n_neighbors = max(1, min(15, len(rows) - 1))
 
+    positions = None
     try:
         positions = await asyncio.to_thread(
             lambda: UMAP(n_components=3, random_state=42, n_neighbors=n_neighbors).fit_transform(embeddings)
         )
     except Exception as exc:
-        logger.warning("UMAP position computation failed for user %s: %s", user_id, exc)
-        return
+        logger.warning("UMAP position computation failed for user %s: %s — using random fallback positions", user_id, exc)
 
     unpositioned_ids = {str(r.id) for r in unpositioned}
+    rng = np.random.default_rng(42)
     for i, row in enumerate(rows):
         if str(row.id) in unpositioned_ids:
+            if positions is not None:
+                x, y, z = float(positions[i][0]), float(positions[i][1]), float(positions[i][2])
+            else:
+                x, y, z = [float(v) for v in rng.uniform(-50, 50, 3)]
             await db.execute(
                 sa_text("""
                     UPDATE concept_embeddings
                     SET pos_x = :x, pos_y = :y, pos_z = :z
                     WHERE id = :id
                 """),
-                {
-                    "x": float(positions[i][0]),
-                    "y": float(positions[i][1]),
-                    "z": float(positions[i][2]),
-                    "id": row.id,
-                },
+                {"x": x, "y": y, "z": z, "id": row.id},
             )
 
     await db.commit()
