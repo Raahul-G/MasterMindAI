@@ -202,6 +202,7 @@ async def score_quiz(
                 )
         except Exception as exc:
             logger.warning("Post-completion side-effects failed for quiz %s: %s", quiz_id, exc)
+            await db.rollback()  # Restore session so subsequent DB ops in this request still work
 
     # 3. Look for next passage in same module (order_index + 1)
     next_passage: Passage | None = None
