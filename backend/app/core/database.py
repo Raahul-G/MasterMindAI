@@ -11,9 +11,16 @@ engine = create_async_engine(
 )
 
 
+async def _try_register_vector(conn):
+    try:
+        await register_vector(conn)
+    except Exception:
+        pass  # pgvector extension not installed — graph endpoints will fail, but others work
+
+
 @event.listens_for(engine.sync_engine, "connect")
 def on_connect(dbapi_conn, _):
-    dbapi_conn.run_async(register_vector)
+    dbapi_conn.run_async(_try_register_vector)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
 
