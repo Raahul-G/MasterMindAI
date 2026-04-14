@@ -4,7 +4,7 @@ import uuid
 
 import numpy as np
 from openai import AsyncOpenAI
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, or_, select, text as sa_text
 from sqlalchemy.ext.asyncio import AsyncSession
 from umap import UMAP
 
@@ -34,6 +34,43 @@ async def _get_embedding(text: str) -> list[float]:
         input=text[:8000],
     )
     return response.data[0].embedding
+
+
+def _vec_str(embedding: list[float]) -> str:
+    """Format a Python list as a PostgreSQL vector literal."""
+    return "[" + ",".join(str(float(x)) for x in embedding) + "]"
+
+
+def _parse_vec(val) -> list[float]:
+    """Parse a vector value whether returned as list, numpy array, or text string."""
+    if isinstance(val, str):
+        return [float(x) for x in val.strip("[]").split(",")]
+    return [float(x) for x in val]
+
+
+async def _insert_embedding(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    canonical: str,
+    embedding: list[float],
+    module_id: uuid.UUID,
+) -> None:
+    """Insert a new concept embedding row using raw SQL to avoid asyncpg codec issues."""
+    await db.execute(
+        sa_text("""
+            INSERT INTO concept_embeddings
+                (id, user_id, canonical_concept, embedding, hub_score, module_ids, created_at, updated_at)
+            VALUES
+                (gen_random_uuid(), :uid, :canonical, CAST(:emb AS vector), 1, :mids, now(), now())
+        """),
+        {
+            "uid": user_id,
+            "canonical": canonical,
+            "emb": _vec_str(embedding),
+            "mids": [module_id],
+        },
+    )
+    await db.commit()
 
 
 async def embed_and_upsert(
@@ -66,43 +103,43 @@ async def embed_and_upsert(
         return
 
     embedding = await _get_embedding(content)
-
-    node = ConceptEmbedding(
-        user_id=user_id,
-        canonical_concept=canonical,
-        embedding=embedding,
-        hub_score=1,
-        module_ids=[module_id],
-    )
-    db.add(node)
-    await db.commit()
-    await db.refresh(node)
-
+    await _insert_embedding(db, user_id, canonical, embedding, module_id)
     await compute_positions_for_user(user_id, db)
 
 
 async def compute_positions_for_user(user_id: uuid.UUID, db: AsyncSession) -> None:
-    result = await db.execute(
-        select(ConceptEmbedding).where(ConceptEmbedding.user_id == user_id)
-    )
-    all_nodes = [n for n in result.scalars().all() if n.embedding is not None]
+    # Select embeddings as text to avoid asyncpg codec issues with the vector type
+    rows = (
+        await db.execute(
+            sa_text("""
+                SELECT id, embedding::text, pos_x
+                FROM concept_embeddings
+                WHERE user_id = :uid AND embedding IS NOT NULL
+            """),
+            {"uid": user_id},
+        )
+    ).fetchall()
 
-    if not all_nodes:
+    if not rows:
         return
 
-    unpositioned = [n for n in all_nodes if n.pos_x is None]
+    unpositioned = [r for r in rows if r.pos_x is None]
     if not unpositioned:
         return
 
-    if len(all_nodes) == 1:
-        all_nodes[0].pos_x = 0.0
-        all_nodes[0].pos_y = 0.0
-        all_nodes[0].pos_z = 0.0
+    if len(rows) == 1:
+        await db.execute(
+            sa_text("""
+                UPDATE concept_embeddings SET pos_x = 0, pos_y = 0, pos_z = 0
+                WHERE user_id = :uid
+            """),
+            {"uid": user_id},
+        )
         await db.commit()
         return
 
-    embeddings = np.array([n.embedding for n in all_nodes], dtype=np.float32)
-    n_neighbors = max(1, min(15, len(all_nodes) - 1))
+    embeddings = np.array([_parse_vec(r.embedding) for r in rows], dtype=np.float32)
+    n_neighbors = max(1, min(15, len(rows) - 1))
 
     try:
         positions = await asyncio.to_thread(
@@ -112,34 +149,52 @@ async def compute_positions_for_user(user_id: uuid.UUID, db: AsyncSession) -> No
         logger.warning("UMAP position computation failed for user %s: %s", user_id, exc)
         return
 
-    unpositioned_ids = {n.id for n in unpositioned}
-    for i, node in enumerate(all_nodes):
-        if node.id in unpositioned_ids:
-            node.pos_x = float(positions[i][0])
-            node.pos_y = float(positions[i][1])
-            node.pos_z = float(positions[i][2])
+    unpositioned_ids = {str(r.id) for r in unpositioned}
+    for i, row in enumerate(rows):
+        if str(row.id) in unpositioned_ids:
+            await db.execute(
+                sa_text("""
+                    UPDATE concept_embeddings
+                    SET pos_x = :x, pos_y = :y, pos_z = :z
+                    WHERE id = :id
+                """),
+                {
+                    "x": float(positions[i][0]),
+                    "y": float(positions[i][1]),
+                    "z": float(positions[i][2]),
+                    "id": row.id,
+                },
+            )
 
     await db.commit()
 
 
 async def get_graph(user_id: uuid.UUID, db: AsyncSession) -> GraphResponse:
-    result = await db.execute(
-        select(ConceptEmbedding).where(ConceptEmbedding.user_id == user_id)
-    )
-    nodes = result.scalars().all()
+    # Explicitly exclude the embedding column — we never need it for display,
+    # and it avoids asyncpg codec issues when the vector type codec isn't registered.
+    rows = (
+        await db.execute(
+            sa_text("""
+                SELECT id, canonical_concept, pos_x, pos_y, pos_z, hub_score, module_ids
+                FROM concept_embeddings
+                WHERE user_id = :uid
+            """),
+            {"uid": user_id},
+        )
+    ).fetchall()
 
     return GraphResponse(
         nodes=[
             GraphNode(
-                id=n.id,
-                label=n.canonical_concept,
-                pos_x=n.pos_x,
-                pos_y=n.pos_y,
-                pos_z=n.pos_z,
-                hub_score=n.hub_score,
-                module_ids=n.module_ids or [],
+                id=row.id,
+                label=row.canonical_concept,
+                pos_x=row.pos_x,
+                pos_y=row.pos_y,
+                pos_z=row.pos_z,
+                hub_score=row.hub_score,
+                module_ids=row.module_ids or [],
             )
-            for n in nodes
+            for row in rows
         ]
     )
 
@@ -202,15 +257,7 @@ async def retroactive_populate(user_id: uuid.UUID, db: AsyncSession) -> int:
 
         try:
             embedding = await _get_embedding(passage.content)
-            node = ConceptEmbedding(
-                user_id=user_id,
-                canonical_concept=canonical,
-                embedding=embedding,
-                hub_score=1,
-                module_ids=[passage.module_id],
-            )
-            db.add(node)
-            await db.commit()
+            await _insert_embedding(db, user_id, canonical, embedding, passage.module_id)
             count += 1
         except Exception as exc:
             logger.warning("Failed to embed passage %s: %s", passage.id, exc)
