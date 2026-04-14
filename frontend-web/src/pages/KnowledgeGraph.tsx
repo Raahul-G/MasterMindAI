@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ForceGraph3D from 'react-force-graph-3d'
 import Navbar from '../components/Navbar'
-import { getGraph } from '../api/graph'
+import { getGraph, populateGraph } from '../api/graph'
 import { useGraphStore } from '../store/graphStore'
 import type { GraphNode } from '../types'
 
@@ -19,9 +19,32 @@ export default function KnowledgeGraph() {
   const [mappedNodes, setMappedNodes] = useState<MappedNode[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [populating, setPopulating] = useState(false)
   const setHasNewNodes = useGraphStore((s) => s.setHasNewNodes)
   const containerRef = useRef<HTMLDivElement>(null)
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight })
+
+  const handlePopulate = async () => {
+    setPopulating(true)
+    try {
+      await populateGraph()
+      const res = await getGraph()
+      const nodes: MappedNode[] = res.nodes
+        .filter((n: GraphNode) => n.pos_x !== null)
+        .map((n: GraphNode) => ({
+          id: n.id, label: n.label,
+          fx: n.pos_x as number, fy: n.pos_y as number, fz: n.pos_z as number,
+          val: Math.max(1, n.hub_score * 1.5),
+          color: n.hub_score > 1 ? '#4ade80' : '#16a34a',
+        }))
+      setMappedNodes(nodes)
+      setError(null)
+    } catch {
+      setError('Failed to populate graph. Please try again.')
+    } finally {
+      setPopulating(false)
+    }
+  }
 
   useEffect(() => {
     setHasNewNodes(false)
@@ -71,11 +94,18 @@ export default function KnowledgeGraph() {
         )}
 
         {!loading && !error && mappedNodes.length === 0 && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
             <p className="text-green-700 text-5xl">🌱</p>
             <p className="text-gray-400 text-sm text-center max-w-xs">
               Complete your first concept to grow your knowledge map.
             </p>
+            <button
+              onClick={handlePopulate}
+              disabled={populating}
+              className="text-xs text-gray-500 border border-gray-700 rounded-full px-4 py-1.5 hover:border-gray-500 hover:text-gray-300 transition-colors disabled:opacity-40"
+            >
+              {populating ? 'Importing...' : 'Import existing concepts'}
+            </button>
           </div>
         )}
 
