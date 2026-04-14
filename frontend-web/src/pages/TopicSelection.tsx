@@ -63,8 +63,9 @@ export default function TopicSelection() {
 
         <form onSubmit={handleStart} className="flex flex-col gap-6">
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-2">Topic</label>
+            <label htmlFor="topic" className="text-sm font-medium text-gray-700 block mb-2">Topic</label>
             <input
+              id="topic"
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}

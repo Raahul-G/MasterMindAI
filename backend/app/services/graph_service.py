@@ -4,12 +4,13 @@ import uuid
 
 import numpy as np
 from openai import AsyncOpenAI
-from sqlalchemy import and_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from umap import UMAP
 
 from app.core.config import settings
 from app.models.learning import ConceptEmbedding, Module, Passage
+from app.models.social import Friendship
 from app.schemas.learning import GraphNode, GraphResponse
 
 logger = logging.getLogger(__name__)
@@ -141,6 +142,26 @@ async def get_graph(user_id: uuid.UUID, db: AsyncSession) -> GraphResponse:
             for n in nodes
         ]
     )
+
+
+async def get_friend_graph(
+    current_user_id: uuid.UUID,
+    friend_user_id: uuid.UUID,
+    db: AsyncSession,
+) -> GraphResponse:
+    friendship = await db.execute(
+        select(Friendship).where(
+            Friendship.status == "accepted",
+            or_(
+                and_(Friendship.requester_id == current_user_id, Friendship.addressee_id == friend_user_id),
+                and_(Friendship.requester_id == friend_user_id, Friendship.addressee_id == current_user_id),
+            ),
+        )
+    )
+    if not friendship.scalar_one_or_none():
+        raise PermissionError("You are not friends with this user.")
+
+    return await get_graph(friend_user_id, db)
 
 
 async def retroactive_populate(user_id: uuid.UUID, db: AsyncSession) -> int:

@@ -6,6 +6,7 @@ import QuizCard from '../components/QuizCard'
 import ThinkingCard from '../components/ThinkingCard'
 import { submitQuiz, remediate, generateQuiz, nextPair } from '../api/learning'
 import { useLearningStore } from '../store/learningStore'
+import { useGraphStore } from '../store/graphStore'
 import type { AnswerSubmission, Remediation, Question } from '../types'
 
 type Phase =
@@ -71,6 +72,7 @@ export default function Learning() {
   const [pendingQuizId, setPendingQuizId] = useState<string>('')
   const [pendingQuestions, setPendingQuestions] = useState<Question[]>([])
 
+  const setHasNewNodes = useGraphStore((s) => s.setHasNewNodes)
   const navigate = useNavigate()
 
   if (!moduleId || !currentPassage) {
@@ -96,6 +98,8 @@ export default function Learning() {
         setPhase('failed')
         return
       }
+
+      setHasNewNodes(true)
 
       if (data.next_passage && data.next_quiz_id && data.next_questions.length > 0) {
         // Pause on score screen before advancing to next concept in pair

@@ -5,6 +5,156 @@ Entries are ordered newest first.
 
 ---
 
+## Devlog — 13 Apr 2026 at 18:30
+> Trigger: manual /devlog — E2E test suite fully passing (54/54)
+
+### 🎯 What Was Planned
+Resume the `bmad-qa-generate-e2e-tests` session and fix all remaining Playwright E2E test failures. At session start the suite was at 29/54 passing (25 failing). Goal: reach 54/54.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `frontend-web/tests/e2e/knowledge-graph.spec.ts` | Modified | Fixed all route stubs to not intercept page navigations; fixed social stub shapes |
+| `frontend-web/tests/e2e/learning-flow.spec.ts` | Modified | Fixed `stubStartModule`, strict-mode locators, and `next_questions` stub data |
+| `frontend-web/src/api/axiosClient.ts` | Modified | 401 interceptor now skips redirect for `/auth/login` and `/auth/register` |
+| `frontend-web/src/pages/Login.tsx` | Modified | Added `htmlFor`/`id` pairs so `getByLabel('Email')` / `getByLabel('Password')` work |
+| `frontend-web/src/pages/Register.tsx` | Modified | Added `htmlFor`/`id` pairs for all three fields |
+| `frontend-web/src/pages/TopicSelection.tsx` | Modified | Added `htmlFor="topic"` / `id="topic"` so `getByLabel('Topic')` works |
+| `frontend-web/tests/e2e/auth.spec.ts` | Modified | Fixed `/modules` stub shape (`[]` not `{data:[]}`), removed `localStorage.clear()` on about:blank |
+| `frontend-web/tests/e2e/dashboard.spec.ts` | Modified | Fixed all `/modules` stubs to return arrays directly |
+| `_bmad-output/implementation-artifacts/tests/test-summary.md` | Modified | Updated to reflect final 54/54 result and all 9 bugs fixed |
+
+#### Code Summary
+
+**`resourceType() !== 'document'` guard — `knowledge-graph.spec.ts`**
+What it does: All `**/graph` and `**/graph/friend/...` route stubs now check that the intercepted request is NOT a page navigation before fulfilling with JSON. Navigation requests (`resourceType === 'document'`) are passed through so the SPA can load normally.
+Why this way: Playwright's `**` glob matches any URL — including `http://localhost:5173/graph` (page load) and `https://...railway.app/graph` (API call). Without the guard, the stub returned raw JSON as the page body, so React never loaded.
+
+**`method() === 'POST'` guard — `learning-flow.spec.ts` `stubStartModule()`**
+What it does: The `**/learn/start` stub now only fulfills for POST requests. GET requests (page navigation to `/learn/start`) are continued through to Vite.
+Why this way: Same root cause as above — the navigation to the TopicSelection page matched the stub, serving JSON instead of HTML.
+
+**401 interceptor auth-endpoint exclusion — `axiosClient.ts`**
+What it does: Before attempting token refresh or redirecting, the interceptor checks if the failed request was to `/auth/login` or `/auth/register`. If so, it rejects immediately without clearing tokens or navigating.
+Why this way: A 401 from login means "wrong credentials" — expected behaviour that the Login component handles by showing an error message. The redirect was causing a page reload that wiped the error state before it rendered.
+
+### 🔄 Logic Changes
+Axios 401 interceptor previously applied the same redirect-to-login logic to all 401 responses including auth endpoints. Now `/auth/login` and `/auth/register` are excluded, which is the correct semantic (those endpoints return 401 to indicate bad credentials, not expired sessions).
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| KnowledgeGraph page shows raw JSON `{"nodes":[]}` instead of React app | `**/graph` stub intercepted the page navigation GET as well as the API call | Added `resourceType() !== 'document'` guard to all graph stubs |
+| `getByLabel('Topic').fill()` times out — TopicSelection never renders | `**/learn/start` stub intercepted GET navigation, serving JSON body as the page | Added `method() === 'POST'` guard to `stubStartModule` |
+| Login error message never shows; page reloads on 401 | Axios interceptor called `window.location.href = '/login'` on all 401s including login itself | Excluded `/auth/login` and `/auth/register` from the redirect logic |
+| Strict mode violation: `getByText('Gradient Descent')` matched 2 elements | Both `<h1>` (page header) and `<h3>` (PassageCard title) contain the concept name | Used `getByRole('heading', { level: 1 })` for header; `.first()` for failed-concept list |
+| `concept_passed` phase never triggered; "Next concept" button not found | Test stub sent `next_questions: []`; Learning.tsx guards on `length > 0` | Updated stub to include one real question in `next_questions` |
+| `TypeError: modules.map is not a function` on Dashboard | Stubs returned `{ data: [] }` — axios double-wraps it, so `modsRes.data` is an object | Changed all `/modules` stubs to return arrays directly |
+| `SecurityError: localStorage access denied` in ProtectedRoute tests | `localStorage.clear()` called on `about:blank` before any navigation | Removed the calls; fresh test contexts already have empty storage |
+
+### 📋 Planned vs Built
+Matched plan. All 54 tests now pass. The most significant unplanned discovery was the route-stub-vs-navigation conflict — a subtle Playwright pitfall where `**` globs match the SPA page load as well as API calls. The fix pattern (`resourceType() !== 'document'`) is now documented in the test summary for future reference.
+
+---
+
+## Devlog — 13 Apr 2026 at 13:00
+> Trigger: milestone — Knowledge Graph Goal 3 complete (Friend Graph View)
+
+### 🎯 What Was Planned
+Add a read-only 3D graph view for a friend's knowledge graph. Entry point: "View their graph →" button on `module_completed` activity feed items in Friends.tsx. Backend: friendship-gated `GET /graph/friend/{user_id}`. Frontend: new `FriendGraph.tsx` page.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `_bmad-output/implementation-artifacts/spec-knowledge-graph-goal3.md` | Created | WIP spec — intent, constraints, I/O matrix, build order |
+| `backend/app/services/graph_service.py` | Modified | Added `get_friend_graph()`: verifies accepted friendship, delegates to `get_graph()` for the friend |
+| `backend/app/routers/graph.py` | Modified | Added `GET /graph/friend/{friend_user_id}`: JWT-protected, maps `PermissionError` → 403 |
+| `frontend-web/src/api/graph.ts` | Modified | Added `getFriendGraph(friendUserId)` — typed GET call to `/graph/friend/:id` |
+| `frontend-web/src/pages/FriendGraph.tsx` | Created | Read-only 3D graph page: fetches friend's nodes, shows ForceGraph3D, back button, 403-aware error |
+| `frontend-web/src/pages/Friends.tsx` | Modified | Added "🕸️ View their graph →" button on `module_completed` feed items; navigates with `friendName` in route state |
+| `frontend-web/src/App.tsx` | Modified | Registered `/graph/friend/:userId` protected route |
+
+#### Code Summary
+
+**`get_friend_graph()` — `backend/app/services/graph_service.py`**
+What it does: Queries `Friendship` table for an `accepted` row in either direction between `current_user_id` and `friend_user_id`. Raises `PermissionError` if none found; otherwise delegates to `get_graph(friend_user_id)`.
+Why this way: Reuses `get_graph()` entirely — no duplicated query logic; the only new logic is the friendship gate.
+
+**`GET /graph/friend/{friend_user_id}` — `backend/app/routers/graph.py`**
+What it does: FastAPI validates `friend_user_id` as a UUID, calls `get_friend_graph()`, and converts `PermissionError` to HTTP 403.
+Why this way: Keeps service layer free of HTTP concerns; the try/except in the router is the one place where domain errors become HTTP errors.
+
+**`FriendGraph.tsx` — `frontend-web/src/pages/`**
+What it does: Reads `:userId` from params and `friendName` from `location.state`. Fetches `getFriendGraph()` on mount, renders ForceGraph3D with same node mapping as `KnowledgeGraph.tsx`. Shows a 403-specific message vs. a generic network error. Header bar shows friend's name + concept count; back button navigates to `/friends`.
+Why this way: Same node mapping function avoids divergence between self and friend graph rendering; `location.state` avoids an extra API call just to display a name.
+
+**Feed "View graph" button — `frontend-web/src/pages/Friends.tsx`**
+What it does: For each `module_completed` feed item, renders a small "🕸️ View their graph →" button that navigates to `/graph/friend/:userId` with `{ friendName }` in route state.
+Why this way: `module_completed` is the activity type that most directly implies new graph nodes were added — it's the right contextual trigger.
+
+### 🔄 Logic Changes
+`graph_service.py` now imports `Friendship` model and `or_` from SQLAlchemy — previously neither was needed in this file. `graph.py` now imports `uuid` and `HTTPException` — previously only `Depends` was needed.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| None | — | — |
+
+### 📋 Planned vs Built
+Matched the spec exactly. TypeScript: 0 errors. All 3 Knowledge Graph goals (backend pipeline, own graph view, friend graph view) are now complete.
+
+---
+
+## Devlog — 13 Apr 2026 at 12:00
+> Trigger: milestone — Knowledge Graph frontend fully wired (WIP Goal 2 complete)
+
+### 🎯 What Was Planned
+Complete the Knowledge Graph frontend integration. The backend pipeline (embeddings + UMAP + API) was shipped in the previous session. Goal 2 was to create the frontend page, store, API module, Navbar link, and wire it all into the router.
+
+### ✅ What Was Built / Changed
+
+| File | Type | What It Does |
+|------|------|--------------|
+| `frontend-web/src/pages/KnowledgeGraph.tsx` | Created | Full-screen 3D force-graph page: fetches nodes from `/graph`, maps them to ForceGraph3D format, shows empty/loading/error states |
+| `frontend-web/src/api/graph.ts` | Created | Two typed API calls — `getGraph()` (GET /graph) and `populateGraph()` (POST /graph/populate) |
+| `frontend-web/src/store/graphStore.ts` | Created | Zustand store with a single `hasNewNodes` boolean — set true on concept pass, cleared when the Graph page is opened |
+| `frontend-web/src/components/Navbar.tsx` | Modified | Added "🕸️ Graph" link to `/graph`; shows a live green dot badge when `hasNewNodes` is true |
+| `frontend-web/src/pages/Learning.tsx` | Modified | Calls `setHasNewNodes(true)` after every concept is passed, signalling the Navbar to show the dot |
+| `frontend-web/src/types/index.ts` | Modified | Added `GraphNode` and `GraphResponse` interfaces |
+| `frontend-web/src/App.tsx` | Modified | Added missing `<Route path="/graph" ...>` — the component was imported but the route was never registered |
+
+#### Code Summary
+
+**`KnowledgeGraph` — `frontend-web/src/pages/KnowledgeGraph.tsx`**
+What it does: On mount, clears `hasNewNodes` and fetches the user's concept nodes. Filters out nodes with null positions, maps each to `{ fx, fy, fz, val, color }` for ForceGraph3D, and renders the 3D scene sized to the container via a `ResizeObserver`.
+Why this way: Fixed positions (`fx/fy/fz`) from the UMAP backend bypass the browser-side simulation so the layout is stable and deterministic.
+
+**`useGraphStore` — `frontend-web/src/store/graphStore.ts`**
+What it does: Single boolean `hasNewNodes`; `setHasNewNodes(true)` called in `Learning.tsx` on every concept pass, `setHasNewNodes(false)` called when the Graph page opens.
+Why this way: Minimal store — no server state here, just a UI signal between two unrelated components (Learning page → Navbar dot).
+
+**`/graph` route — `frontend-web/src/App.tsx`**
+What it does: Registers `<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>` at path `/graph`.
+Why this way: Was missing — component was imported and Navbar linked to it, but the route table had no entry so all clicks silently hit the `*` catch-all redirect.
+
+### 🔄 Logic Changes
+None. All files were net-new additions or additive changes. The only corrective change was adding the missing route registration.
+
+### 🐛 Errors Encountered & Fixes
+
+| Error | What Caused It | Fix Applied |
+|-------|---------------|-------------|
+| `/graph` link in Navbar redirected to `/` | `KnowledgeGraph` imported in `App.tsx` but `<Route path="/graph">` never added | Added the route above the `*` catch-all in `App.tsx` |
+
+### 📋 Planned vs Built
+Matched plan. All frontend pieces for the Knowledge Graph were already created before the interruption; the only missing piece discovered on resume was the unregistered route. TypeScript check passes with 0 errors across the full frontend.
+
+---
+
 ## Devlog — 31 Mar 2026 at 16:45
 > Trigger: milestone — achievement system fully redesigned (Mastery Bar, Badge Locker, Progressive Streak Bar)
 

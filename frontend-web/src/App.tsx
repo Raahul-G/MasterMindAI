@@ -9,6 +9,8 @@ import Learning from './pages/Learning'
 import Profile from './pages/Profile'
 import Friends from './pages/Friends'
 import ModuleReview from './pages/ModuleReview'
+import KnowledgeGraph from './pages/KnowledgeGraph'
+import FriendGraph from './pages/FriendGraph'
 
 export default function App() {
   return (
@@ -27,6 +29,8 @@ export default function App() {
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/friends" element={<ProtectedRoute><Friends /></ProtectedRoute>} />
         <Route path="/modules/:id/review" element={<ProtectedRoute><ModuleReview /></ProtectedRoute>} />
+        <Route path="/graph" element={<ProtectedRoute><KnowledgeGraph /></ProtectedRoute>} />
+        <Route path="/graph/friend/:userId" element={<ProtectedRoute><FriendGraph /></ProtectedRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

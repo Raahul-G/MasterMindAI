@@ -153,3 +153,17 @@ export interface ModuleReview {
   quiz_attempts: number | null
   questions: ReviewQuestion[]
 }
+
+export interface GraphNode {
+  id: string
+  label: string
+  pos_x: number | null
+  pos_y: number | null
+  pos_z: number | null
+  hub_score: number
+  module_ids: string[]
+}
+
+export interface GraphResponse {
+  nodes: GraphNode[]
+}

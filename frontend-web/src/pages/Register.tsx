@@ -60,8 +60,9 @@ export default function Register() {
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Full name</label>
+            <label htmlFor="reg-fullname" className="text-sm font-medium text-gray-700 block mb-1">Full name</label>
             <input
+              id="reg-fullname"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -71,8 +72,9 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Email</label>
+            <label htmlFor="reg-email" className="text-sm font-medium text-gray-700 block mb-1">Email</label>
             <input
+              id="reg-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -82,9 +84,10 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Password</label>
+            <label htmlFor="reg-password" className="text-sm font-medium text-gray-700 block mb-1">Password</label>
             <div className="relative">
               <input
+                id="reg-password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

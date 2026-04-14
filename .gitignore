@@ -49,3 +49,12 @@ htmlcov/
 .mypy_cache/
 .pytype/
 ROADMAP.md
+
+# claude
+.claude/
+
+# bmad
+_bmad/
+_bmad-output/
+
+frontend-web/test-results/

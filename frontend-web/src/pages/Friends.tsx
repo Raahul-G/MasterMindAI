@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import LoadingSpinner from '../components/LoadingSpinner'
 import {
@@ -28,6 +29,7 @@ function feedDescription(item: ActivityFeedItem): string {
 }
 
 export default function Friends() {
+  const navigate = useNavigate()
   const [friends, setFriends] = useState<FriendResponse[]>([])
   const [requests, setRequests] = useState<FriendRequestResponse[]>([])
   const [feed, setFeed] = useState<ActivityFeedItem[]>([])
@@ -193,6 +195,14 @@ export default function Friends() {
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-semibold text-gray-800">{item.user.full_name} </span>
                     <span className="text-sm text-gray-500">{feedDescription(item)}</span>
+                    {item.activity_type === 'module_completed' && (
+                      <button
+                        onClick={() => navigate(`/graph/friend/${item.user.id}`, { state: { friendName: item.user.full_name } })}
+                        className="block text-xs text-green-600 hover:text-green-700 font-semibold mt-1"
+                      >
+                        🕸️ View their graph →
+                      </button>
+                    )}
                   </div>
                   <span className="text-xs text-gray-300 flex-shrink-0">{timeAgo(item.created_at)}</span>
                 </div>
