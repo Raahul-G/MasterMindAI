@@ -58,3 +58,6 @@ _bmad/
 _bmad-output/
 
 frontend-web/test-results/
+
+# Milestones
+milestones/
