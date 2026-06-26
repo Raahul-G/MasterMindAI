@@ -247,92 +247,6 @@ Interactive docs: `/docs`
 | GET | `/notion/callback` | No | OAuth callback handler |
 | DELETE | `/notion/disconnect` | Yes | Remove Notion credentials |
 
----
-
-## Local Development
-
-### Prerequisites
-- Python 3.12+
-- Node.js 20+
-- [uv](https://docs.astral.sh/uv) — `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- A [Supabase](https://supabase.com) project
-- An LLM API key (Anthropic or OpenAI)
-
-### Backend
-
-```bash
-cd backend
-uv venv --python 3.12
-source .venv/bin/activate
-uv pip install -r requirements.txt
-
-cp .env.example .env
-# Fill in all values in .env
-
-alembic upgrade head
-python -m scripts.seed_achievements
-
-uvicorn main:app --reload --port 8000
-```
-
-Swagger UI: `http://localhost:8000/docs`
-
-### Frontend
-
-```bash
-cd frontend-web
-npm install
-
-# Create .env:
-# VITE_API_BASE_URL=http://localhost:8000
-# VITE_GOOGLE_CLIENT_ID=your-google-client-id
-
-npm run dev
-```
-
-App: `http://localhost:5173`
-
-### Tests
-
-```bash
-# Backend unit tests (54 tests)
-cd backend && pytest tests/ -v
-
-# Frontend E2E tests (54 tests)
-cd frontend-web && npx playwright test
-```
-
----
-
-## Environment Variables
-
-### `backend/.env`
-
-```env
-DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:PORT/DB_NAME
-SUPABASE_URL=https://your-project-ref.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SECRET_KEY=generate-with-openssl-rand-hex-32
-JWT_ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-ANTHROPIC_API_KEY=sk-ant-your-key
-ANTHROPIC_MODEL=claude-sonnet-4-20250514
-LLM_PROVIDER=anthropic
-GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-secret
-NOTION_CLIENT_ID=your-notion-client-id
-NOTION_CLIENT_SECRET=your-notion-client-secret
-NOTION_REDIRECT_URI=http://localhost:8000/notion/callback
-ENVIRONMENT=development
-FRONTEND_URL=http://localhost:5173
-```
-
-### `frontend-web/.env`
-
-```env
-VITE_API_BASE_URL=http://localhost:8000
-VITE_GOOGLE_CLIENT_ID=your-id.apps.googleusercontent.com
-```
 
 ---
 
@@ -382,26 +296,6 @@ MasterMindAI/
 │
 └── screenshots/                       # App screenshots
 ```
-
----
-
-## Build Progress
-
-| Stage | Description | Status |
-|---|---|---|
-| 1 | Environment Setup | ✅ Complete |
-| 2 | Supabase Database | ✅ Complete |
-| 3 | Authentication API | ✅ Complete |
-| 4 | Core AI Service (LangGraph) | ✅ Complete |
-| 5 | Learning Module API | ✅ Complete |
-| 6 | Cloud Storage + Markdown Export | ✅ Complete |
-| 7 | Notion Integration | ✅ Complete |
-| 8 | Gamification API | ✅ Complete |
-| 9 | Social Features API | ✅ Complete |
-| 10 | Backend Deploy (Railway) | ✅ Complete |
-| 11 | Web Frontend — 13 pages (Vercel) | ✅ Complete |
-| 12 | Android App (React Native + Expo) | ⬜ Next |
-
 ---
 
 ## Engineering Principles
@@ -418,4 +312,4 @@ MasterMindAI/
 
 ---
 
-Built by [Raahul G](https://github.com/Raahul-G)
+Built by [Raahul Gupta](https://github.com/Raahul-G)
