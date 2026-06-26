@@ -13,11 +13,11 @@ MasterMind uses a large language model to generate personalised learning content
 
 | Login | Home | Start Learning |
 |---|---|---|
-| ![Login](screenshots/01-login.png) | ![Home](screenshots/02-home.png) | ![Start Learning](screenshots/03-start-learning.png) |
+| <img src="screenshots/01-login.png" width="260"/> | <img src="screenshots/02-home.png" width="260"/> | <img src="screenshots/03-start-learning.png" width="260"/> |
 
 | Concept Cards | Quiz | Profile & Achievements |
 |---|---|---|
-| ![Concepts](screenshots/05-concept.png) | ![Quiz](screenshots/06-quiz.png) | ![Profile](screenshots/04-profile.png) |
+| <img src="screenshots/05-concept.png" width="260"/> | <img src="screenshots/06-quiz.png" width="260"/> | <img src="screenshots/04-profile.png" width="260"/> |
 
 ---
 
