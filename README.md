@@ -4,7 +4,7 @@
 
 MasterMind uses a large language model to generate personalised learning content, adaptive quizzes, and intelligent remediation loops. It doesn't just present information — it teaches you until you genuinely understand, using your own interests as the lens for every explanation.
 
-**Live app:** [mastermind-ai.vercel.app](https://mastermind-ai.vercel.app)
+**Live app:** [mastermind-ai.vercel.app](https://master-mind-ai.vercel.app/)
 **API docs:** [mastermindai-production.up.railway.app/docs](https://mastermindai-production.up.railway.app/docs)
 
 ---
